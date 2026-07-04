@@ -11,3 +11,4 @@
 | 2026-07-04 | 20:30 | İsim/Domain | RDAP ile 30 aday tarandı. BOŞ .com'lar: urbhex, mahalio, livhex, kenthex, hexrisk, guvenmap, mapizmit, hexmahal (2026-07-04 itibarıyla). Öneri: Urbhex | - | OK |
 | 2026-07-04 | 21:00 | Rebrand | urbhex.com satın alındı. Habitex → Urbhex geçişi: PDR/kurallar dosyaları yeniden adlandırıldı, tüm kod ve dokümanlar güncellendi (v1.1) | URBHEX_PDR.md, urbhex_rules.md, app/**, bot/** | OK |
 | 2026-07-04 | 21:00 | Logo | Animasyonlu SVG logo (petek kümesi + wordmark) ve Flutter splash animasyonu eklendi (v1.0) | /assets/logo/urbhex_logo_animated.svg, /app/lib/screens/splash_screen.dart | OK |
+| 2026-07-04 | 21:30 | Haber Kaynakları | 11 URL canlı test edildi; 5 doğrulanmış asayiş kaynağı config'e yazıldı (kocaeligazetesi, kocaelibaris, bizimyaka, gazetegebze, kocaelikoz). Eski 404 URL düzeltildi (v1.1) | /bot/config.py | OK |
