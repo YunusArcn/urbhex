@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -104,7 +104,7 @@ class _MapScreenState extends State<MapScreen> {
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'app.habitex',
+              userAgentPackageName: 'com.urbhex.app',
             ),
             PolygonLayer(
               polygons: [

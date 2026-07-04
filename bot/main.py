@@ -1,8 +1,8 @@
-"""Habitex boru hattı orkestratörü.
+﻿"""Urbhex boru hattı orkestratörü.
 
 Akış: Tara → (yeni haber yoksa dur, maliyet 0) → AI ayrıştır → Tekilleştir → Kaydet.
 Zamanlama: cron / systemd timer ile 6 saatte bir çalıştırılır:
-    0 */6 * * * cd /opt/habitex/bot && python main.py
+    0 */6 * * * cd /opt/urbhex/bot && python main.py
 """
 import asyncio
 

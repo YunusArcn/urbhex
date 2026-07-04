@@ -1,4 +1,4 @@
-# HABITEX PDR (Project Design Requirements)
+﻿# URBHEX PDR (Project Design Requirements)
 > Bu doküman projenin anayasasıdır. Tüm geliştirme süreçlerinde referans alınır.
 > Son güncelleme: 2026-07-04
 
@@ -6,7 +6,7 @@
 
 ## 1. Proje Vizyonu
 
-**Habitex**, küresel ölçekte çalışan, harita tabanlı bir **Canlı Yaşam Analitiği ve Asayiş Haber Platformu**dur. Kullanıcılara sadece suç verisi değil; ulaşım, sosyal yaşam ve emlak verilerini birleştirerek **"Mahalle Yaşanabilirlik Endeksi"** sunar.
+**Urbhex**, küresel ölçekte çalışan, harita tabanlı bir **Canlı Yaşam Analitiği ve Asayiş Haber Platformu**dur. Kullanıcılara sadece suç verisi değil; ulaşım, sosyal yaşam ve emlak verilerini birleştirerek **"Mahalle Yaşanabilirlik Endeksi"** sunar.
 
 **Amaç:** Taşınma veya gayrimenkul yatırımı kararı alan kişilere, hedefledikleri bölgenin güvenlik durumunu veri odaklı, şeffaf ve hukuka uygun şekilde sunan interaktif bir harita platformu yaratmak.
 
@@ -132,7 +132,7 @@ Aynı olayın farklı ajanslardan mükerrer kaydını engellemek için üç aşa
 
 ## 13. Proje Yönetim Protokolü
 
-- **HABITEX_PDR.md** (bu dosya): Projenin anayasası.
-- **habitex_rules.md:** Geliştirme kuralları — AI ajanlar koda dokunmadan önce okur.
+- **URBHEX_PDR.md** (bu dosya): Projenin anayasası.
+- **Urbhex_rules.md:** Geliştirme kuralları — AI ajanlar koda dokunmadan önce okur.
 - **development_log.md:** Her işlemin tarihçesi. Ajanlar her görev sonunda buraya satır ekler; hatalar "Bug" etiketiyle kaydedilir.
-- **Altın Komut:** Her göreve şu eklenir: *"Görevi tamamladıktan sonra development_log.md dosyasını güncelle. Hata yaparsan habitex_rules.md kurallarına tekrar bak ve düzelt."*
+- **Altın Komut:** Her göreve şu eklenir: *"Görevi tamamladıktan sonra development_log.md dosyasını güncelle. Hata yaparsan Urbhex_rules.md kurallarına tekrar bak ve düzelt."*

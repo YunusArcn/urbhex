@@ -1,7 +1,8 @@
-# Habitex — Mahalle Güvenlik ve Yaşanabilirlik Endeksi
+﻿# Urbhex — Mahalle Güvenlik ve Yaşanabilirlik Endeksi
 
 Faz 1 (MVP): İzmit'teki asayiş haberlerinin H3 altıgen bazlı harita gösterimi.
-Anayasa: [HABITEX_PDR.md](HABITEX_PDR.md) · Kurallar: [habitex_rules.md](habitex_rules.md) · Günlük: [development_log.md](development_log.md)
+Anayasa: [URBHEX_PDR.md](URBHEX_PDR.md) · Kurallar: [urbhex_rules.md](urbhex_rules.md) · Günlük: [development_log.md](development_log.md)
+Web: https://urbhex.com
 
 ## Proje Yapısı
 

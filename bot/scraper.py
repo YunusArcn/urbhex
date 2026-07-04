@@ -1,4 +1,4 @@
-"""Veri Avı: kaynakları asenkron tarar, yalnızca YENİ haber linklerini döndürür.
+﻿"""Veri Avı: kaynakları asenkron tarar, yalnızca YENİ haber linklerini döndürür.
 
 "Ahtapot mantığı": tüm kaynaklara aynı anda istek atılır, sıralı beklenmez.
 """
@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from config import NEWS_SOURCES
 
-HEADERS = {"User-Agent": "HabitexBot/0.1 (+asayis haber endeksi; iletisim: habitex)"}
+HEADERS = {"User-Agent": "UrbhexBot/0.1 (+https://urbhex.com)"}
 
 
 @dataclass

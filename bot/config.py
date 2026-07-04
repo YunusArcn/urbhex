@@ -1,4 +1,4 @@
-"""Habitex bot yapılandırması. Her ayar tek yerden yönetilir."""
+﻿"""Urbhex bot yapılandırması. Her ayar tek yerden yönetilir."""
 import os
 
 from dotenv import load_dotenv

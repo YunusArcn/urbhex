@@ -1,4 +1,4 @@
-# HABITEX PROJECT RULES (Anayasa)
+﻿# URBHEX PROJECT RULES (Anayasa)
 
 > AI ajanlar (Claude / OpenCode) bu dosyayı okumadan hiçbir koda dokunamaz.
 

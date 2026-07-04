@@ -8,3 +8,6 @@
 | 2026-07-04 | 20:00 | Flutter UI | Adaptive harita ekranı, hex katmanı (bbox yükleme), olay paneli (sonsuz kaydırma), disclaimer (v1.0) | /app/lib/** | OK |
 | 2026-07-04 | 20:00 | Dokümantasyon | README (kurulum + çalıştırma) ve .gitignore eklendi | /README.md, /.gitignore | OK |
 | 2026-07-04 | 20:00 | Bug | Ortamda Flutter/Python/Node kurulu değil — kod derlenmedi, kurulum adımları README'de. Kurulum sonrası "flutter create . --platforms web" gerekli | - | AÇIK |
+| 2026-07-04 | 20:30 | İsim/Domain | RDAP ile 30 aday tarandı. BOŞ .com'lar: urbhex, mahalio, livhex, kenthex, hexrisk, guvenmap, mapizmit, hexmahal (2026-07-04 itibarıyla). Öneri: Urbhex | - | OK |
+| 2026-07-04 | 21:00 | Rebrand | urbhex.com satın alındı. Habitex → Urbhex geçişi: PDR/kurallar dosyaları yeniden adlandırıldı, tüm kod ve dokümanlar güncellendi (v1.1) | URBHEX_PDR.md, urbhex_rules.md, app/**, bot/** | OK |
+| 2026-07-04 | 21:00 | Logo | Animasyonlu SVG logo (petek kümesi + wordmark) ve Flutter splash animasyonu eklendi (v1.0) | /assets/logo/urbhex_logo_animated.svg, /app/lib/screens/splash_screen.dart | OK |
