@@ -12,3 +12,4 @@
 | 2026-07-04 | 21:00 | Rebrand | urbhex.com satın alındı. Habitex → Urbhex geçişi: PDR/kurallar dosyaları yeniden adlandırıldı, tüm kod ve dokümanlar güncellendi (v1.1) | URBHEX_PDR.md, urbhex_rules.md, app/**, bot/** | OK |
 | 2026-07-04 | 21:00 | Logo | Animasyonlu SVG logo (petek kümesi + wordmark) ve Flutter splash animasyonu eklendi (v1.0) | /assets/logo/urbhex_logo_animated.svg, /app/lib/screens/splash_screen.dart | OK |
 | 2026-07-04 | 21:30 | Haber Kaynakları | 11 URL canlı test edildi; 5 doğrulanmış asayiş kaynağı config'e yazıldı (kocaeligazetesi, kocaelibaris, bizimyaka, gazetegebze, kocaelikoz). Eski 404 URL düzeltildi (v1.1) | /bot/config.py | OK |
+| 2026-07-04 | 22:00 | Global Hat (GDELT) | GDELT 2.0 boru hattı: 15dk'lık export CSV → CAMEO filtre (17-20) → koordinat → H3 → tekilleştirmeli kayıt. Bing News API kullanılmadı (Microsoft Ağu 2025'te emekliye ayırdı) (v1.0) | /bot/gdelt.py | OK |
