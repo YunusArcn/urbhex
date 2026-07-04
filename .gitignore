@@ -1,0 +1,30 @@
+# Gizli bilgiler — ASLA commit edilmez
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Flutter / Dart
+app/.dart_tool/
+app/build/
+app/.flutter-plugins*
+app/.packages
+app/pubspec.lock
+app/web/
+app/android/
+app/ios/
+app/windows/
+app/macos/
+app/linux/
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+Thumbs.db
+.DS_Store
