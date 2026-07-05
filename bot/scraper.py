@@ -35,7 +35,10 @@ def _extract_links(list_html: str, base_url: str) -> list[str]:
         if href.startswith("/"):
             root = base_url.split("/", 3)
             href = f"{root[0]}//{root[2]}{href}"
-        if href.startswith("http") and any(k in href.lower() for k in ("haber", "asayis", "3-sayfa")):
+        low = href.lower().rstrip("/")
+        if low.endswith("-haberleri") or low.endswith("/haberleri"):
+            continue  # kategori sayfaları haber değil (410/404 gürültüsü yapıyordu)
+        if href.startswith("http") and any(k in low for k in ("haber", "asayis", "3-sayfa")):
             links.add(href.split("?")[0])
     return sorted(links)
 

@@ -23,11 +23,11 @@ def process_article(article) -> str:
     if parsed is None:
         return "atlandi"
 
-    hex_info = geo.resolve_hex(parsed.mahalle)
+    hex_info = geo.resolve_hex(parsed.mahalle, parsed.ilce)
     if hex_info is None:
         # Bölgeyle eşlenemeyen haber (trafik kazası dahil her tür): raporla, boyama.
         db.report_unmatched(article.url, article.source,
-                            f"mahalle_bulunamadi:{parsed.mahalle or 'yok'}")
+                            f"konum_cozulemedi:{parsed.mahalle or '-'}/{parsed.ilce or '-'}")
         return "konumsuz"
 
     occurred = parsed.tarih.isoformat()
