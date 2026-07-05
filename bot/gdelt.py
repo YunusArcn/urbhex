@@ -17,7 +17,7 @@ import aiohttp
 import h3
 
 import db
-from config import H3_RES_COARSE, H3_RES_FINE
+from config import H3_RES_COARSE, H3_RES_FINE, H3_RES_POP
 
 LASTUPDATE_URL = "http://data.gdeltproject.org/gdeltv2/lastupdate.txt"
 
@@ -82,6 +82,7 @@ def _parse_events(zip_bytes: bytes) -> list[dict]:
             "summary": f"Uluslararasi basinda raporlanan olay ({row[COL_GEO_NAME]}). Detay icin kaynaga bakiniz.",
             "district": row[COL_GEO_NAME][:120] or "Bilinmiyor",
             "h3_res9": h3_res9,
+            "h3_res8": h3.cell_to_parent(h3_res9, H3_RES_POP),  # nüfus eşlemesi (şema v2)
             "h3_res7": h3.latlng_to_cell(lat, lng, H3_RES_COARSE),
             "lat": center_lat,   # hex merkezi (KVKK: nokta adres yazılmaz)
             "lng": center_lng,

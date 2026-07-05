@@ -45,7 +45,7 @@ def _extract_body(article_html: str) -> str:
     for tag in soup(["script", "style", "nav", "footer", "header", "aside"]):
         tag.decompose()
     paragraphs = [p.get_text(" ", strip=True) for p in soup.select("article p, .haber-detay p, p")]
-    return "\n".join(t for t in paragraphs if len(t) > 40)[:8000]
+    return "\n".join(t for t in paragraphs if len(t) > 40)[:3500]  # token tasarrufu
 
 
 async def scrape_new_articles(known_urls: set[str]) -> list[Article]:

@@ -5,7 +5,7 @@ Kaynak: mahalle merkez koordinatları (OSM'den elle derlendi, genişletilecek).
 """
 import h3
 
-from config import H3_RES_COARSE, H3_RES_FINE
+from config import H3_RES_COARSE, H3_RES_FINE, H3_RES_POP
 
 # İzmit mahalle merkezleri (lat, lng) — MVP başlangıç seti, OSM'den genişletilecek.
 IZMIT_MAHALLE_MERKEZLERI: dict[str, tuple[float, float]] = {
@@ -32,13 +32,22 @@ def _normalize(name: str) -> str:
 
 
 def resolve_hex(mahalle: str | None) -> dict | None:
-    """Mahalle adını hex bilgisine çevirir. Bilinmeyen mahalle → İzmit merkez."""
-    key = _normalize(mahalle) if mahalle else "izmit merkez"
-    lat, lng = IZMIT_MAHALLE_MERKEZLERI.get(key, IZMIT_MAHALLE_MERKEZLERI["izmit merkez"])
+    """Mahalle adını hex bilgisine çevirir.
+
+    Bilinmeyen mahalle → None döner; çağıran taraf haberi unmatched_news'e
+    raporlar. (Yanlış hex boyamaktansa hiç boyamamak tercih edilir.)
+    """
+    if not mahalle:
+        return None
+    key = _normalize(mahalle)
+    if key not in IZMIT_MAHALLE_MERKEZLERI:
+        return None
+    lat, lng = IZMIT_MAHALLE_MERKEZLERI[key]
     h3_res9 = h3.latlng_to_cell(lat, lng, H3_RES_FINE)
     center_lat, center_lng = h3.cell_to_latlng(h3_res9)
     return {
         "h3_res9": h3_res9,
+        "h3_res8": h3.cell_to_parent(h3_res9, H3_RES_POP),  # nüfus eşlemesi (şema v2)
         "h3_res7": h3.latlng_to_cell(lat, lng, H3_RES_COARSE),
         "lat": center_lat,   # hex MERKEZİ yazılır — olay adresi değil (KVKK)
         "lng": center_lng,

@@ -107,7 +107,11 @@ class _IncidentCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Chip(label: Text(incident.eventTypeLabel), visualDensity: VisualDensity.compact),
+            Chip(
+              avatar: Icon(incident.icon, size: 16),
+              label: Text(incident.eventTypeLabel),
+              visualDensity: VisualDensity.compact,
+            ),
             const Spacer(),
             Text('${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}'),
           ]),

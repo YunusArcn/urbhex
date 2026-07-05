@@ -25,6 +25,16 @@ H3_RES_FINE = 9    # ~0.1 km2, sokak seviyesi
 H3_RES_COARSE = 7  # ~5 km2, genel bakış
 
 EVENT_TYPES = [
-    "cinayet", "gasp", "yaralama", "haneye_tecavuz",
-    "hirsizlik", "uyusturucu", "diger",
+    "cinayet", "silahli_saldiri", "gasp", "yaralama", "haneye_tecavuz",
+    "kavga", "hirsizlik", "uyusturucu", "trafik_kazasi", "diger",
+]
+
+H3_RES_POP = 8  # nüfus eşleme çözünürlüğü (hex_population tablosu)
+
+# Token tasarrufu: metinde bu kelimelerden biri yoksa haber AI'a HİÇ gönderilmez.
+# (Asayiş sayfalarında magazin/duyuru da çıkabiliyor — onlara token harcanmaz.)
+ASAYIS_KEYWORDS = [
+    "hırsız", "gasp", "cinayet", "öldür", "yaralan", "yaralı", "bıçak", "silah",
+    "kaza", "çarptı", "uyuşturucu", "kavga", "darp", "polis", "jandarma",
+    "gözaltı", "tutukla", "operasyon", "soygun", "kaçakçı", "dolandır", "cinsel",
 ]

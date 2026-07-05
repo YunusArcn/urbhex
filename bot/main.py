@@ -8,16 +8,28 @@ import asyncio
 
 import db
 import geo
+from config import ASAYIS_KEYWORDS
 from parser import is_same_incident, parse_article
 from scraper import scrape_new_articles
 
 
 def process_article(article) -> str:
+    # Ücretsiz ön filtre: asayiş kelimesi yoksa AI'a gönderme (token maliyeti: 0).
+    text_lower = article.text.lower()
+    if not any(k in text_lower for k in ASAYIS_KEYWORDS):
+        return "atlandi"
+
     parsed = parse_article(article.text)
     if parsed is None:
         return "atlandi"
 
     hex_info = geo.resolve_hex(parsed.mahalle)
+    if hex_info is None:
+        # Bölgeyle eşlenemeyen haber (trafik kazası dahil her tür): raporla, boyama.
+        db.report_unmatched(article.url, article.source,
+                            f"mahalle_bulunamadi:{parsed.mahalle or 'yok'}")
+        return "konumsuz"
+
     occurred = parsed.tarih.isoformat()
 
     # Tekilleştirme — 1. birincil filtre, 2. anlamsal eşleştirme, 3. kaynak dizisi
@@ -44,7 +56,7 @@ async def run() -> None:
     if not articles:
         return  # AI'a gitme — maliyet: 0
 
-    stats = {"eklendi": 0, "birlestirildi": 0, "atlandi": 0, "hata": 0}
+    stats = {"eklendi": 0, "birlestirildi": 0, "atlandi": 0, "konumsuz": 0, "hata": 0}
     for article in articles:
         try:
             stats[process_article(article)] += 1

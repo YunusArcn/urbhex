@@ -11,7 +11,9 @@ from config import EVENT_TYPES
 
 client = anthropic.Anthropic()  # ANTHROPIC_API_KEY ortam değişkeninden okunur
 
-MODEL = "claude-opus-4-8"
+# Maliyet: Haiku 4.5 ($1/$5 per MTok) — ayrıştırma için yeterli zekada, en ucuz katman.
+# NOT: claude-3-5-haiku-20241022 Şubat 2026'da emekli edildi, o ID artık 404 döner.
+MODEL = "claude-haiku-4-5"
 
 SYSTEM_PROMPT = f"""Sen bir asayiş haberi ayrıştırma asistanısın. Sana verilen Türkçe haber metninden \
 yapılandırılmış veri çıkarırsın.
@@ -38,9 +40,9 @@ def parse_article(article_text: str) -> ParsedIncident | None:
     """Tek haber metnini Claude'a gönderir; İzmit asayiş olayı değilse None döner."""
     response = client.messages.parse(
         model=MODEL,
-        max_tokens=2048,
+        max_tokens=1024,  # çıktı küçük bir JSON — daha fazlasına gerek yok
         system=SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Haber metni:\n\n{article_text}"}],
+        messages=[{"role": "user", "content": f"Haber metni:\n\n{article_text[:3500]}"}],
         output_format=ParsedIncident,
     )
     parsed = response.parsed_output
@@ -62,7 +64,7 @@ def is_same_incident(summary_a: str, summary_b: str) -> bool:
 
     response = client.messages.parse(
         model=MODEL,
-        max_tokens=512,
+        max_tokens=256,  # tek boolean cevap
         messages=[{
             "role": "user",
             "content": (

@@ -1,16 +1,18 @@
-﻿import 'dart:async';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../models/hex_score.dart';
+import '../models/incident.dart';
 import '../services/supabase_service.dart';
 import '../utils/hex_utils.dart';
 import '../widgets/incident_sheet.dart';
 
 /// Ana ekran: tam ekran harita + hex katmani + arama cubugu.
-/// Adaptive UI: >800px genislikte olay paneli yanda, altta degil.
+/// Zoom >= [_detailZoom]: hex poligonlari + olay turu ikonlari.
+/// Zoom <  [_detailZoom]: res-7 bazli kume rozetleri ("124" gibi) — performans.
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -20,10 +22,12 @@ class MapScreen extends StatefulWidget {
 
 class _MapScreenState extends State<MapScreen> {
   static const _izmitCenter = LatLng(40.7654, 29.9408);
+  static const _detailZoom = 13.0;
 
   final _service = SupabaseService();
   final _mapController = MapController();
   List<HexScore> _hexes = [];
+  double _zoom = 13;
   Timer? _debounce;
   bool _disclaimerShown = false;
 
@@ -66,8 +70,113 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onMapMoved(MapEvent event) {
+    _zoom = _mapController.camera.zoom;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _loadVisibleHexes);
+  }
+
+  bool get _detailed => _zoom >= _detailZoom;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(children: [
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: _izmitCenter,
+            initialZoom: 13,
+            onMapEvent: _onMapMoved,
+            onTap: (_, point) => _detailed ? _handleTap(point) : null,
+          ),
+          children: [
+            TileLayer(
+              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              userAgentPackageName: 'com.urbhex.app',
+            ),
+            if (_detailed) ...[
+              PolygonLayer(
+                polygons: [
+                  for (final hex in _hexes)
+                    Polygon(
+                      points: HexUtils.hexagonVertices(hex.lat, hex.lng),
+                      color: HexUtils.fillColor(hex.safetyScore),
+                      borderColor: Colors.black26,
+                      borderStrokeWidth: 0.5,
+                    ),
+                ],
+              ),
+              MarkerLayer(markers: _eventIconMarkers()),
+            ] else
+              MarkerLayer(markers: _clusterMarkers()),
+          ],
+        ),
+        _buildSearchBar(),
+      ]),
+    );
+  }
+
+  /// Yakin zoom: her hex'in merkezine baskin olay turunun ikonu.
+  List<Marker> _eventIconMarkers() {
+    return [
+      for (final hex in _hexes)
+        Marker(
+          point: LatLng(hex.lat, hex.lng),
+          width: 30,
+          height: 30,
+          child: GestureDetector(
+            onTap: () => _onHexTapped(hex),
+            child: CircleAvatar(
+              backgroundColor: Colors.white.withOpacity(0.9),
+              child: Icon(
+                eventTypeIcon(hex.topEventType),
+                size: 17,
+                color: HexUtils.clusterColor(hex.safetyScore),
+              ),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  /// Uzak zoom: hex'ler res-7 ebeveynine gore toplanir, tek rozet + sayi.
+  /// Binlerce poligon/ikon cizilmez → harita kasmaz.
+  List<Marker> _clusterMarkers() {
+    final groups = <String, List<HexScore>>{};
+    for (final hex in _hexes) {
+      groups.putIfAbsent(hex.h3Res7, () => []).add(hex);
+    }
+    return [
+      for (final entry in groups.entries)
+        () {
+          final members = entry.value;
+          final total = members.fold(0, (s, h) => s + h.incidentCount);
+          final avgScore =
+              (members.fold(0, (s, h) => s + h.safetyScore) / members.length).round();
+          final center = LatLng(
+            members.fold(0.0, (s, h) => s + h.lat) / members.length,
+            members.fold(0.0, (s, h) => s + h.lng) / members.length,
+          );
+          final size = total > 99 ? 52.0 : (total > 20 ? 44.0 : 36.0);
+          return Marker(
+            point: center,
+            width: size,
+            height: size,
+            child: GestureDetector(
+              // Kumeye tiklayinca yakinlas → kume dagilir, ikonlara donusur.
+              onTap: () => _mapController.move(center, _detailZoom + 0.5),
+              child: CircleAvatar(
+                backgroundColor: HexUtils.clusterColor(avgScore),
+                child: Text(
+                  '$total',
+                  style: const TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ),
+          );
+        }(),
+    ];
   }
 
   void _onHexTapped(HexScore hex) {
@@ -87,41 +196,6 @@ class _MapScreenState extends State<MapScreen> {
         builder: (_) => IncidentSheet(hex: hex),
       );
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: _izmitCenter,
-            initialZoom: 13,
-            onMapEvent: _onMapMoved,
-            onTap: (_, point) => _handleTap(point),
-          ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.urbhex.app',
-            ),
-            PolygonLayer(
-              polygons: [
-                for (final hex in _hexes)
-                  Polygon(
-                    points: HexUtils.hexagonVertices(hex.lat, hex.lng),
-                    color: HexUtils.fillColor(hex.riskScore),
-                    borderColor: Colors.black26,
-                    borderStrokeWidth: 0.5,
-                  ),
-              ],
-            ),
-          ],
-        ),
-        _buildSearchBar(),
-      ]),
-    );
   }
 
   /// Tiklanan noktaya en yakin hex'i bul (basit mesafe kontrolu, MVP).

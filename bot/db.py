@@ -14,9 +14,23 @@ def get_client() -> Client:
 
 
 def known_source_urls() -> set[str]:
-    """Daha önce işlenmiş tüm kaynak URL'leri (tekrar AI'a gitmesin — maliyet 0 kuralı)."""
+    """Daha önce işlenmiş tüm kaynak URL'leri (tekrar AI'a gitmesin — maliyet 0 kuralı).
+
+    Konumu çözülemeyip raporlanan haberler de dahildir (tekrar denenmez).
+    """
+    urls = set()
     rows = get_client().table("incidents").select("source_urls").execute().data
-    return {url for row in rows for url in row["source_urls"]}
+    urls.update(url for row in rows for url in row["source_urls"])
+    unmatched = get_client().table("unmatched_news").select("url").execute().data
+    urls.update(row["url"] for row in unmatched)
+    return urls
+
+
+def report_unmatched(url: str, source: str, reason: str) -> None:
+    """Bölgeyle eşlenemeyen haberi raporla — sessizce atılmaz, incelenmek üzere saklanır."""
+    get_client().table("unmatched_news").upsert(
+        {"url": url, "source": source, "reason": reason}, on_conflict="url"
+    ).execute()
 
 
 def find_dedup_candidates(occurred_on: str, h3_res9: str, event_type: str) -> list[dict]:

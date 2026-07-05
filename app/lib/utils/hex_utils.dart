@@ -24,12 +24,16 @@ class HexUtils {
     });
   }
 
-  /// Risk skoruna gore dolgu rengi (PDR: seffaf %40-50 katman).
-  static Color fillColor(double riskScore) {
-    if (riskScore <= 0) return Colors.transparent;
-    if (riskScore < 5) return Colors.green.withOpacity(0.30);
-    if (riskScore < 15) return Colors.yellow.withOpacity(0.40);
-    if (riskScore < 30) return Colors.orange.withOpacity(0.45);
-    return Colors.red.withOpacity(0.50);
+  /// 1-100 guvenlik skoru → kirmizi(1) → sari(50) → yesil(100) surekli skala.
+  /// PDR kurali: seffaf %40-50 dolgu, sokaklar altigenin arkasindan gorunur.
+  static Color fillColor(int safetyScore) {
+    final t = (safetyScore.clamp(1, 100) - 1) / 99.0; // 0 = riskli, 1 = guvenli
+    return HSVColor.fromAHSV(0.45, 120.0 * t, 0.85, 0.90).toColor();
+  }
+
+  /// Kume rozeti rengi: kumedeki ortalama skora gore.
+  static Color clusterColor(int avgSafetyScore) {
+    final t = (avgSafetyScore.clamp(1, 100) - 1) / 99.0;
+    return HSVColor.fromAHSV(1.0, 120.0 * t, 0.80, 0.75).toColor();
   }
 }
