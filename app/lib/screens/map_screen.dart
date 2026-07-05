@@ -6,13 +6,19 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/hex_score.dart';
 import '../models/incident.dart';
+import '../services/auth_service.dart';
+import '../services/location_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/hex_utils.dart';
+import '../utils/responsive.dart';
 import '../widgets/incident_sheet.dart';
+import 'auth_screen.dart';
+import 'settings_screen.dart';
 
-/// Ana ekran: tam ekran harita + hex katmani + arama cubugu.
-/// Zoom >= [_detailZoom]: hex poligonlari + olay turu ikonlari.
-/// Zoom <  [_detailZoom]: res-7 bazli kume rozetleri ("124" gibi) — performans.
+/// Ana ekran: tam ekran harita + hex katmani + arama + profil menusu.
+/// Harita KULLANICININ KONUMUNDAN acilir (izin verilmezse Izmit).
+/// Zoom >= [_detailZoom]: hex poligonlari + olay ikonlari.
+/// Zoom <  [_detailZoom]: res-7 kume rozetleri — performans.
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
 
@@ -25,6 +31,7 @@ class _MapScreenState extends State<MapScreen> {
   static const _detailZoom = 13.0;
 
   final _service = SupabaseService();
+  final _auth = AuthService();
   final _mapController = MapController();
   List<HexScore> _hexes = [];
   double _zoom = 13;
@@ -36,11 +43,21 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showDisclaimer();
-      _loadVisibleHexes();
+      _startFromUserLocation();
     });
+    // Giris/cikis sonrasi favori durumu vb. tazelensin.
+    _auth.onAuthChange.listen((_) => mounted ? setState(() {}) : null);
   }
 
-  /// Hukuki kalkan: acilis uyarisi.
+  /// Once tarayici/cihaz konumu istenir; alinirsa harita oradan acilir.
+  Future<void> _startFromUserLocation() async {
+    final pos = await LocationService.currentPosition();
+    if (pos != null && mounted) {
+      _mapController.move(pos, 14);
+    }
+    _loadVisibleHexes();
+  }
+
   void _showDisclaimer() {
     if (_disclaimerShown) return;
     _disclaimerShown = true;
@@ -79,6 +96,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final ff = formFactorOf(context);
     return Scaffold(
       body: Stack(children: [
         FlutterMap(
@@ -106,31 +124,38 @@ class _MapScreenState extends State<MapScreen> {
                     ),
                 ],
               ),
-              MarkerLayer(markers: _eventIconMarkers()),
+              MarkerLayer(markers: _eventIconMarkers(ff)),
             ] else
-              MarkerLayer(markers: _clusterMarkers()),
+              MarkerLayer(markers: _clusterMarkers(ff)),
           ],
         ),
-        _buildSearchBar(),
+        _buildTopBar(ff),
       ]),
+      floatingActionButton: FloatingActionButton.small(
+        tooltip: 'Konumuma git',
+        onPressed: _startFromUserLocation,
+        child: const Icon(Icons.my_location),
+      ),
     );
   }
 
   /// Yakin zoom: her hex'in merkezine baskin olay turunun ikonu.
-  List<Marker> _eventIconMarkers() {
+  /// Ikon boyutlari cihaza gore oranlanir (telefon/tablet/pc).
+  List<Marker> _eventIconMarkers(FormFactor ff) {
+    final size = 30.0 * ff.scale;
     return [
       for (final hex in _hexes)
         Marker(
           point: LatLng(hex.lat, hex.lng),
-          width: 30,
-          height: 30,
+          width: size,
+          height: size,
           child: GestureDetector(
             onTap: () => _onHexTapped(hex),
             child: CircleAvatar(
               backgroundColor: Colors.white.withOpacity(0.9),
               child: Icon(
                 eventTypeIcon(hex.topEventType),
-                size: 17,
+                size: 17 * ff.scale,
                 color: HexUtils.clusterColor(hex.safetyScore),
               ),
             ),
@@ -139,9 +164,8 @@ class _MapScreenState extends State<MapScreen> {
     ];
   }
 
-  /// Uzak zoom: hex'ler res-7 ebeveynine gore toplanir, tek rozet + sayi.
-  /// Binlerce poligon/ikon cizilmez → harita kasmaz.
-  List<Marker> _clusterMarkers() {
+  /// Uzak zoom: res-7 kumeleri — binlerce cizim yerine tek rozet + sayi.
+  List<Marker> _clusterMarkers(FormFactor ff) {
     final groups = <String, List<HexScore>>{};
     for (final hex in _hexes) {
       groups.putIfAbsent(hex.h3Res7, () => []).add(hex);
@@ -152,26 +176,27 @@ class _MapScreenState extends State<MapScreen> {
           final members = entry.value;
           final total = members.fold(0, (s, h) => s + h.incidentCount);
           final avgScore =
-              (members.fold(0, (s, h) => s + h.safetyScore) / members.length).round();
+              (members.fold(0, (s, h) => s + h.safetyScore) / members.length)
+                  .round();
           final center = LatLng(
             members.fold(0.0, (s, h) => s + h.lat) / members.length,
             members.fold(0.0, (s, h) => s + h.lng) / members.length,
           );
-          final size = total > 99 ? 52.0 : (total > 20 ? 44.0 : 36.0);
+          final base = total > 99 ? 52.0 : (total > 20 ? 44.0 : 36.0);
+          final size = base * ff.scale;
           return Marker(
             point: center,
             width: size,
             height: size,
             child: GestureDetector(
-              // Kumeye tiklayinca yakinlas → kume dagilir, ikonlara donusur.
               onTap: () => _mapController.move(center, _detailZoom + 0.5),
               child: CircleAvatar(
                 backgroundColor: HexUtils.clusterColor(avgScore),
-                child: Text(
-                  '$total',
-                  style: const TextStyle(
-                      color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                ),
+                child: Text('$total',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13 * ff.scale)),
               ),
             ),
           );
@@ -180,13 +205,14 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onHexTapped(HexScore hex) {
-    final isWide = MediaQuery.sizeOf(context).width > 800;
-    if (isWide) {
+    final ff = formFactorOf(context);
+    if (ff.sidePanel) {
       showDialog(
         context: context,
         builder: (_) => Dialog(
           alignment: Alignment.centerRight,
-          child: SizedBox(width: 420, child: IncidentSheet(hex: hex)),
+          insetPadding: const EdgeInsets.all(16),
+          child: SizedBox(width: 460, child: IncidentSheet(hex: hex)),
         ),
       );
     } else {
@@ -198,7 +224,6 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  /// Tiklanan noktaya en yakin hex'i bul (basit mesafe kontrolu, MVP).
   void _handleTap(LatLng point) {
     const d = Distance();
     for (final hex in _hexes) {
@@ -209,31 +234,75 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildTopBar(FormFactor ff) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: Material(
-              elevation: 4,
-              borderRadius: BorderRadius.circular(28),
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: 'Mahalle ara...',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: ff.searchBarMaxWidth),
+                  child: Material(
+                    elevation: 4,
                     borderRadius: BorderRadius.circular(28),
-                    borderSide: BorderSide.none,
+                    child: TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Mahalle ara...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(28),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                      ),
+                      onSubmitted: _searchMahalle,
+                    ),
                   ),
-                  filled: true,
                 ),
-                onSubmitted: _searchMahalle,
               ),
             ),
-          ),
+            const SizedBox(width: 8),
+            _buildProfileButton(ff),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileButton(FormFactor ff) {
+    final user = _auth.currentUser;
+    return Material(
+      elevation: 4,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () async {
+          if (user == null) {
+            await Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+          } else {
+            // Ayarlardan favori secilirse (lat, lng) doner → haritayi odakla.
+            final result = await Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+            if (result is (num, num)) {
+              _mapController.move(
+                  LatLng(result.$1.toDouble(), result.$2.toDouble()), 15);
+            }
+          }
+          if (mounted) setState(() {});
+        },
+        child: CircleAvatar(
+          radius: 22 * ff.scale,
+          backgroundColor:
+              user == null ? Colors.grey.shade200 : const Color(0xFF1B5E20),
+          child: user == null
+              ? const Icon(Icons.person_outline, color: Colors.black54)
+              : Text((user.email ?? 'U')[0].toUpperCase(),
+                  style: const TextStyle(color: Colors.white)),
         ),
       ),
     );
