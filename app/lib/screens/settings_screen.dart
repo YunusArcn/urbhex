@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../services/favorites_service.dart';
+import '../services/notifications_service.dart';
 
-/// Ayarlar: profil (isim + profil fotografi) ve favori bolgeler.
+/// Ayarlar: profil, kayitli konumlar (Ev/Is + Guvenlik Alarmi) ve bildirimler.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -14,9 +15,11 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final _auth = AuthService();
   final _favorites = FavoritesService();
+  final _notifications = NotificationsService();
   final _nameController = TextEditingController();
   final _avatarController = TextEditingController();
   List<Map<String, dynamic>> _favs = [];
+  List<Map<String, dynamic>> _notifs = [];
   bool _saving = false;
 
   @override
@@ -28,11 +31,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _load() async {
     final profile = await _auth.getProfile();
     final favs = await _favorites.list();
+    final notifs = await _notifications.list(limit: 10);
     if (!mounted) return;
     setState(() {
       _nameController.text = profile?['display_name'] ?? '';
       _avatarController.text = profile?['avatar_url'] ?? '';
       _favs = favs;
+      _notifs = notifs;
     });
   }
 
@@ -48,6 +53,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
           .showSnackBar(const SnackBar(content: Text('Profil kaydedildi')));
     }
   }
+
+  IconData _kindIcon(String? kind) => switch (kind) {
+        'ev' => Icons.home,
+        'is' => Icons.work,
+        _ => Icons.place,
+      };
 
   @override
   Widget build(BuildContext context) {
@@ -98,30 +109,97 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onPressed: _saving ? null : _save,
                   child: const Text('Profili kaydet'),
                 ),
+
                 const Divider(height: 40),
-                Text('Favori Bölgelerim',
+                Text('Kayıtlı Konumlarım',
                     style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 8),
-                if (_favs.isEmpty)
-                  const Text('Henüz favori bölgen yok. Haritada bir altıgene '
-                      'dokunup kalp simgesine bas.'),
-                for (final fav in _favs)
-                  ListTile(
-                    leading: const Icon(Icons.favorite, color: Colors.red),
-                    title: Text(fav['label'] ?? 'Favori bölgem'),
-                    subtitle: Text(
-                        '(${(fav['lat'] as num).toStringAsFixed(4)}, ${(fav['lng'] as num).toStringAsFixed(4)})'),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () async {
-                        await _favorites.remove(fav['id']);
-                        _load();
-                      },
-                    ),
-                    // Favoriye dokununca harita oraya odaklansin diye konum doner.
-                    onTap: () => Navigator.pop(
-                        context, (fav['lat'] as num, fav['lng'] as num)),
+
+                // Premium bilgilendirmesi (lansman: ucretsiz deneme)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber.shade300),
                   ),
+                  child: Row(children: [
+                    Icon(Icons.workspace_premium, color: Colors.amber.shade800),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Text(
+                        'Güvenlik Alarmı — Premium özellik, lansman süresince '
+                        'ÜCRETSİZ. Açık olduğunda konumunun 2 km çevresindeki '
+                        'her yeni olayda bildirim + e-posta alırsın.',
+                        style: TextStyle(fontSize: 12.5),
+                      ),
+                    ),
+                  ]),
+                ),
+                const SizedBox(height: 8),
+
+                if (_favs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Text('Henüz kayıtlı konumun yok. Haritada bir '
+                        'altıgene dokunup kalp simgesine bas; Ev veya İş '
+                        'olarak kaydet.'),
+                  ),
+                for (final fav in _favs)
+                  Card(
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      leading: Icon(_kindIcon(fav['kind'] as String?),
+                          color: const Color(0xFF1B5E20)),
+                      title: Text(fav['label'] ?? 'Konumum'),
+                      subtitle: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Text('Alarm', style: TextStyle(fontSize: 12)),
+                        Switch(
+                          value: fav['alert_enabled'] == true,
+                          onChanged: (v) async {
+                            await _favorites.setAlert(fav['id'], v);
+                            _load();
+                          },
+                        ),
+                      ]),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () async {
+                          await _favorites.remove(fav['id']);
+                          _load();
+                        },
+                      ),
+                      onTap: () => Navigator.pop(
+                          context, (fav['lat'] as num, fav['lng'] as num)),
+                    ),
+                  ),
+
+                const Divider(height: 40),
+                Text('Son Bildirimlerim',
+                    style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                if (_notifs.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Text('Henüz bildirim yok.'),
+                  ),
+                for (final n in _notifs)
+                  ListTile(
+                    dense: true,
+                    leading: Icon(
+                      n['read'] == true
+                          ? Icons.notifications_none
+                          : Icons.notifications_active,
+                      color: n['read'] == true ? null : Colors.red,
+                    ),
+                    title: Text(n['title'] ?? '',
+                        style: const TextStyle(fontSize: 13)),
+                    subtitle: Text(n['body'] ?? '',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12)),
+                  ),
+
                 const Divider(height: 40),
                 OutlinedButton.icon(
                   icon: const Icon(Icons.logout),

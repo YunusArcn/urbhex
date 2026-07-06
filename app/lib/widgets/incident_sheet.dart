@@ -55,9 +55,25 @@ class _IncidentSheetState extends State<IncidentSheet> {
 
   Future<void> _toggleFavorite() async {
     try {
-      final nowFav = await _favorites.toggle(widget.hex);
-      Analytics.capture(nowFav ? 'favorite_add' : 'favorite_remove');
-      if (mounted) setState(() => _isFav = nowFav);
+      if (_isFav) {
+        await _favorites.removeByHex(widget.hex.h3Res9);
+        Analytics.capture('favorite_remove');
+        if (mounted) setState(() => _isFav = false);
+        return;
+      }
+      final details = await _askFavoriteDetails();
+      if (details == null) return; // vazgecti
+      await _favorites.add(widget.hex, label: details.$1, kind: details.$2);
+      Analytics.capture('favorite_add', {'kind': details.$2});
+      if (mounted) {
+        setState(() => _isFav = true);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Konum kaydedildi. Güvenlik Alarmı açık: 2 km '
+              'çevresinde olay olursa bildirim ve e-posta alacaksın '
+              '(lansman süresince ücretsiz).'),
+          duration: Duration(seconds: 5),
+        ));
+      }
     } on StateError {
       // Uye degil → giris ekranina yonlendir, donunce tekrar dene.
       if (!mounted) return;
@@ -67,6 +83,59 @@ class _IncidentSheetState extends State<IncidentSheet> {
       );
       if (loggedIn == true) _toggleFavorite();
     }
+  }
+
+  /// "Bu konum senin icin ne?" — Ev / Is / Diger + istege bagli ozel ad.
+  Future<(String, String)?> _askFavoriteDetails() async {
+    var kind = 'ev';
+    final labelController = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Konumu kaydet'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'ev', label: Text('Ev'), icon: Icon(Icons.home)),
+                ButtonSegment(value: 'is', label: Text('İş'), icon: Icon(Icons.work)),
+                ButtonSegment(value: 'diger', label: Text('Diğer'), icon: Icon(Icons.place)),
+              ],
+              selected: {kind},
+              onSelectionChanged: (s) => setDialogState(() => kind = s.first),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: labelController,
+              decoration: const InputDecoration(
+                labelText: 'Özel ad (isteğe bağlı)',
+                hintText: 'örn: Annemin evi, Dükkan...',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              'Güvenlik Alarmı: bu konumun 2 km çevresinde yeni olay '
+              'olduğunda bildirim + e-posta gönderilir. Premium özellik — '
+              'lansman süresince ücretsiz.',
+              style: TextStyle(fontSize: 12),
+            ),
+          ]),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Vazgeç')),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Kaydet')),
+          ],
+        ),
+      ),
+    );
+    if (result != true) return null;
+    final fallback = switch (kind) { 'ev' => 'Evim', 'is' => 'İş yerim', _ => 'Konumum' };
+    final label = labelController.text.trim();
+    return (label.isEmpty ? fallback : label, kind);
   }
 
   Map<String, List<Incident>> get _byType {

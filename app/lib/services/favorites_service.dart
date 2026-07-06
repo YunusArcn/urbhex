@@ -2,7 +2,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/hex_score.dart';
 
-/// Favori bolge islemleri (uyelik gerektirir; RLS kullanici bazli korur).
+/// Kayitli konumlar: Ev / Is / Diger (uyelik gerektirir; RLS korur).
+/// Guvenlik Alarmi (alert_enabled) premium ozelliktir — lansmanda ucretsiz.
 class FavoritesService {
   final _client = Supabase.instance.client;
 
@@ -30,30 +31,37 @@ class FavoritesService {
     return row != null;
   }
 
-  /// Ekli ise cikarir, degilse ekler. Yeni durumu dondurur.
-  Future<bool> toggle(HexScore hex, {String? label}) async {
+  /// Konumu etiketiyle kaydeder: kind = 'ev' | 'is' | 'diger'.
+  Future<void> add(HexScore hex, {required String label, required String kind}) async {
     final user = _client.auth.currentUser;
     if (user == null) throw StateError('login_required');
-
-    if (await isFavorite(hex.h3Res9)) {
-      await _client
-          .from('favorites')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('h3_res9', hex.h3Res9);
-      return false;
-    }
-    await _client.from('favorites').insert({
+    await _client.from('favorites').upsert({
       'user_id': user.id,
       'h3_res9': hex.h3Res9,
-      'label': label ?? 'Favori bölgem',
+      'label': label,
+      'kind': kind,
       'lat': hex.lat,
       'lng': hex.lng,
-    });
-    return true;
+      'alert_enabled': true, // lansman donemi: alarm herkese acik
+    }, onConflict: 'user_id,h3_res9');
+  }
+
+  Future<void> removeByHex(String h3Res9) async {
+    final user = _client.auth.currentUser;
+    if (user == null) return;
+    await _client
+        .from('favorites')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('h3_res9', h3Res9);
   }
 
   Future<void> remove(String id) async {
     await _client.from('favorites').delete().eq('id', id);
+  }
+
+  /// Guvenlik Alarmi ac/kapa (premium bayragi).
+  Future<void> setAlert(String id, bool enabled) async {
+    await _client.from('favorites').update({'alert_enabled': enabled}).eq('id', id);
   }
 }

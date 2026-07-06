@@ -65,4 +65,15 @@ def append_source(incident_id: str, existing_urls: list[str], new_url: str) -> N
 
 
 def insert_incident(record: dict) -> None:
-    get_client().table("incidents").insert(record).execute()
+    """Tek ekleme hunisi: main, gdelt ve scan_worker hep buradan geçer.
+
+    Kayıt sonrası Güvenlik Alarmı kontrolü tetiklenir (favori konumların
+    2 km çevresi). Alarm hatası boru hattını asla durdurmaz.
+    """
+    rows = get_client().table("incidents").insert(record).execute().data
+    try:
+        from alerts import dispatch_for_incident
+
+        dispatch_for_incident({**record, "id": rows[0]["id"] if rows else None})
+    except Exception as exc:
+        print(f"[db] alarm dağıtımı atlandı: {exc}")

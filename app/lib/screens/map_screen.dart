@@ -12,6 +12,7 @@ import '../models/incident.dart';
 import '../services/analytics/analytics.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
+import '../services/notifications_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/hex_utils.dart';
 import '../utils/responsive.dart';
@@ -44,11 +45,13 @@ class _MapScreenState extends State<MapScreen> {
 
   final _service = SupabaseService();
   final _auth = AuthService();
+  final _notifications = NotificationsService();
   final _mapController = MapController();
   final _searchController = TextEditingController();
 
   List<HexScore> _hexes = [];
   List<Incident> _visibleIncidents = [];
+  int _unread = 0;
   List<(String, LatLng)> _suggestions = [];
   int _sinceDays = 365;
   bool _panelOpen = true;
@@ -66,7 +69,18 @@ class _MapScreenState extends State<MapScreen> {
       _panelOpen = formFactorOf(context) != FormFactor.mobile;
       _startFromUserLocation();
     });
-    _auth.onAuthChange.listen((_) => mounted ? setState(() {}) : null);
+    _auth.onAuthChange.listen((_) {
+      if (mounted) {
+        setState(() {});
+        _refreshUnread();
+      }
+    });
+    _refreshUnread();
+  }
+
+  Future<void> _refreshUnread() async {
+    final n = await _notifications.unreadCount();
+    if (mounted) setState(() => _unread = n);
   }
 
   Future<void> _startFromUserLocation() async {
@@ -559,6 +573,8 @@ class _MapScreenState extends State<MapScreen> {
             const SizedBox(width: 8),
             _buildDateFilter(ff),
             const SizedBox(width: 8),
+            _buildBellButton(ff),
+            const SizedBox(width: 8),
             _buildProfileButton(ff),
           ]),
         ]),
@@ -598,6 +614,105 @@ class _MapScreenState extends State<MapScreen> {
         ),
       ),
     );
+  }
+
+  /// Bildirim zili: Guvenlik Alarmi bildirimleri (okunmamis sayaci ile).
+  Widget _buildBellButton(FormFactor ff) {
+    return Material(
+      elevation: 4,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: _showNotifications,
+        child: Padding(
+          padding: EdgeInsets.all(10 * ff.scale),
+          child: Badge(
+            isLabelVisible: _unread > 0,
+            label: Text('$_unread'),
+            child: Icon(Icons.notifications_outlined, size: 24 * ff.scale),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showNotifications() async {
+    if (!_notifications.loggedIn) {
+      await Navigator.push(
+          context, MaterialPageRoute(builder: (_) => const AuthScreen()));
+      _refreshUnread();
+      return;
+    }
+    final items = await _notifications.list();
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(children: [
+          const Expanded(child: Text('Güvenlik Alarmı')),
+          if (items.isNotEmpty)
+            TextButton(
+              onPressed: () async {
+                await _notifications.markAllRead();
+                if (context.mounted) Navigator.pop(context);
+              },
+              child: const Text('Tümünü okundu say', style: TextStyle(fontSize: 12)),
+            ),
+        ]),
+        content: SizedBox(
+          width: 420,
+          child: items.isEmpty
+              ? const Text('Henüz bildirim yok.\n\nHaritada bir bölgeye dokunup '
+                  'kalp simgesiyle Ev/İş konumunu kaydet — 2 km çevresinde olay '
+                  'olursa burada ve e-postanda görürsün (lansman süresince ücretsiz).')
+              : SizedBox(
+                  height: 380,
+                  child: ListView.separated(
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, i) {
+                      final n = items[i];
+                      final created = DateTime.tryParse(n['created_at'] ?? '');
+                      final inc = n['incidents'] as Map<String, dynamic>?;
+                      return ListTile(
+                        dense: true,
+                        leading: Icon(
+                          n['read'] == true
+                              ? Icons.notifications_none
+                              : Icons.notifications_active,
+                          color: n['read'] == true ? null : Colors.red,
+                        ),
+                        title: Text(n['title'] ?? '',
+                            style: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.bold)),
+                        subtitle: Text(
+                          '${n['body'] ?? ''}\n'
+                          '${created != null ? "${created.day.toString().padLeft(2, '0')}.${created.month.toString().padLeft(2, '0')}.${created.year}" : ''}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        onTap: inc == null
+                            ? null
+                            : () {
+                                Navigator.pop(context);
+                                _mapController.move(
+                                    LatLng((inc['lat'] as num).toDouble(),
+                                        (inc['lng'] as num).toDouble()),
+                                    15);
+                                _reloadData();
+                              },
+                      );
+                    },
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Kapat')),
+        ],
+      ),
+    );
+    _refreshUnread();
   }
 
   Widget _buildProfileButton(FormFactor ff) {
