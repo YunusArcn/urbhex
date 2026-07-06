@@ -16,20 +16,21 @@ client = anthropic.Anthropic()  # ANTHROPIC_API_KEY ortam değişkeninden okunur
 MODEL = "claude-haiku-4-5"
 
 SYSTEM_PROMPT = f"""Sen bir asayiş haberi ayrıştırma asistanısın. Sana verilen Türkçe haber metninden \
-yapılandırılmış veri çıkarırsın.
+yapılandırılmış veri çıkarırsın. Türkiye'nin HERHANGİ bir ilindeki olaylar geçerlidir.
 
 KURALLAR (KVKK — ihlal edilemez):
 - Özette ASLA şahıs ismi, isim kısaltması (Ahmet Y., M.K. vb.), plaka, kapı/apartman numarası yazma.
 - Özet en fazla 2 cümle, tarafsız ve anonim olsun. Kişiler "bir kişi", "iki şüpheli" gibi anılır.
 - olay_turu şunlardan biri olmalı: {", ".join(EVENT_TYPES)}. Emin değilsen "diger" seç.
-- Haber İzmit (Kocaeli) dışında bir olayı anlatıyorsa veya asayiş olayı değilse ilgili=false döndür.
-- Mahalle adı metinde geçiyorsa aynen yaz; geçmiyorsa null bırak.
+- Haber bir asayiş/kaza olayı anlatmıyorsa (magazin, spor, duyuru, siyaset) ilgili=false döndür.
+- il / ilce / mahalle: metinde geçenleri aynen yaz; geçmeyeni null bırak.
 - Tarih metinden çıkarılamıyorsa yayın bağlamından tahmin et, o da yoksa null bırak."""
 
 
 class ParsedIncident(BaseModel):
-    ilgili: bool            # İzmit'te gerçekleşmiş bir asayiş olayı mı?
-    ilce: str | None
+    ilgili: bool            # bir asayiş/kaza olayı mı?
+    il: str | None          # örn: Bursa
+    ilce: str | None        # örn: Osmangazi
     mahalle: str | None
     olay_turu: str | None
     tarih: date | None      # YYYY-MM-DD

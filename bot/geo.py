@@ -1,12 +1,13 @@
-"""Mahalle/ilçe adı → koordinat → H3 hex çözümü.
+"""Mahalle/ilçe/il adı → koordinat → H3 hex çözümü (TÜRKİYE GENELİ).
 
 Çözüm sırası:
   1) Yerel sözlük (sık geçen İzmit mahalleleri — ağ isteği yok)
   2) geo_cache.json (daha önce çözülmüş adlar — ağ isteği yok)
   3) Nominatim/OSM coğrafi kodlama (ücretsiz; 1 istek/sn kuralına uyulur)
 
-Mahalle yoksa ilçe merkezi kullanılır (hassasiyet düşer ama olay haritada görünür).
-Kocaeli sınır kutusu dışına düşen sonuçlar reddedilir (yanlış il eşleşmesi olmaz).
+Kademeli geri düşüş: mahalle+ilçe+il → ilçe+il → il merkezi.
+İl adı sorguya dahil edildiği için yanlış şehir eşleşmesi (İstanbul'daki
+"Fatih" gibi) engellenir; sonuçlar Türkiye ile sınırlıdır (countrycodes=tr).
 """
 import json
 import time
@@ -19,8 +20,6 @@ import h3
 from config import H3_RES_COARSE, H3_RES_FINE, H3_RES_POP
 
 _CACHE_FILE = Path(__file__).with_name("geo_cache.json")
-# left(lng), top(lat), right(lng), bottom(lat) — Kocaeli ili
-_KOCAELI_VIEWBOX = "29.20,41.30,30.40,40.50"
 
 # Sık geçen İzmit mahalle merkezleri (lat, lng) — Nominatim'e gitmeden çözülür.
 IZMIT_MAHALLE_MERKEZLERI: dict[str, tuple[float, float]] = {
@@ -56,14 +55,12 @@ def _save_cache(cache: dict) -> None:
 
 
 def _nominatim(query: str) -> tuple[float, float] | None:
-    """OSM Nominatim sorgusu. Kocaeli kutusu dışı sonuç kabul edilmez."""
+    """OSM Nominatim sorgusu (Türkiye ile sınırlı)."""
     params = urllib.parse.urlencode({
         "q": query,
         "format": "json",
         "limit": 1,
         "countrycodes": "tr",
-        "viewbox": _KOCAELI_VIEWBOX,
-        "bounded": 1,
     })
     req = urllib.request.Request(
         f"https://nominatim.openstreetmap.org/search?{params}",
@@ -77,35 +74,53 @@ def _nominatim(query: str) -> tuple[float, float] | None:
     return None
 
 
-def _coords_for(mahalle: str | None, ilce: str | None) -> tuple[float, float] | None:
-    if mahalle:
+def _coords_for(
+    mahalle: str | None, ilce: str | None, il: str | None
+) -> tuple[float, float] | None:
+    il = (il or "").strip()
+    ilce = (ilce or "").strip()
+
+    # Hızlı yol: Kocaeli/İzmit sözlüğü (il belirtilmemişse de dener — eski davranış).
+    if mahalle and (not il or "kocaeli" in _normalize(il)):
         key = _normalize(mahalle)
         if key in IZMIT_MAHALLE_MERKEZLERI:
             return IZMIT_MAHALLE_MERKEZLERI[key]
 
-    district = (ilce or "Izmit").strip()
-    query = f"{mahalle}, {district}, Kocaeli" if mahalle else f"{district}, Kocaeli"
+    # Kademeli sorgular: en hassastan en kabaya.
+    queries = []
+    if mahalle and (ilce or il):
+        queries.append(", ".join(p for p in (mahalle, ilce, il) if p))
+    if ilce:
+        queries.append(", ".join(p for p in (ilce, il) if p) or ilce)
+    if il:
+        queries.append(il)
+    if not queries and mahalle:
+        queries.append(mahalle)  # elde sadece mahalle varsa yine de dene
+    if not queries:
+        return None
 
     cache = _load_cache()
-    if query in cache:
-        return tuple(cache[query]) if cache[query] else None
+    for query in queries:
+        if query in cache:
+            if cache[query]:
+                return tuple(cache[query])
+            continue  # daha önce bulunamamış sorgu — bir alt hassasiyete geç
+        try:
+            coords = _nominatim(query)
+        except Exception:
+            return None  # ağ hatasında cache'e yazma, sonraki turda yeniden dene
+        cache[query] = list(coords) if coords else None
+        _save_cache(cache)
+        if coords:
+            return coords
+    return None
 
-    try:
-        coords = _nominatim(query)
-        # Mahalle bulunamadıysa ilçe merkezine düş (hassasiyet: ilçe).
-        if coords is None and mahalle:
-            coords = _nominatim(f"{district}, Kocaeli")
-    except Exception:
-        return None  # ağ hatasında cache'e yazma, sonraki turda yeniden dene
 
-    cache[query] = list(coords) if coords else None
-    _save_cache(cache)
-    return coords
-
-
-def resolve_hex(mahalle: str | None, ilce: str | None = None) -> dict | None:
-    """Mahalle/ilçe adını hex bilgisine çevirir; çözülemezse None (raporlanır)."""
-    coords = _coords_for(mahalle, ilce)
+def resolve_hex(
+    mahalle: str | None, ilce: str | None = None, il: str | None = None
+) -> dict | None:
+    """Mahalle/ilçe/il adını hex bilgisine çevirir; çözülemezse None (raporlanır)."""
+    coords = _coords_for(mahalle, ilce, il)
     if coords is None:
         return None
     lat, lng = coords

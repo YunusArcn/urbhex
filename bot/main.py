@@ -24,11 +24,13 @@ def process_article(article) -> str:
     if parsed is None:
         return "atlandi"
 
-    hex_info = geo.resolve_hex(parsed.mahalle, parsed.ilce)
+    # Yerel Kocaeli basını il belirtmeyebilir → varsayılan Kocaeli.
+    il = parsed.il or "Kocaeli"
+    hex_info = geo.resolve_hex(parsed.mahalle, parsed.ilce, il)
     if hex_info is None:
         # Bölgeyle eşlenemeyen haber (trafik kazası dahil her tür): raporla, boyama.
         db.report_unmatched(article.url, article.source,
-                            f"konum_cozulemedi:{parsed.mahalle or '-'}/{parsed.ilce or '-'}")
+                            f"konum_cozulemedi:{parsed.mahalle or '-'}/{parsed.ilce or '-'}/{il}")
         return "konumsuz"
 
     occurred = parsed.tarih.isoformat()
@@ -45,7 +47,7 @@ def process_article(article) -> str:
         "occurred_on": occurred,
         "event_type": parsed.olay_turu,
         "summary": parsed.kisa_ozet,
-        "district": parsed.ilce or "Izmit",
+        "district": ", ".join(p for p in (parsed.ilce, il) if p),
         "source_urls": [article.url],
         **hex_info,
     })

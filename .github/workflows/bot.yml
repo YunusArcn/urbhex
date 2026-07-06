@@ -41,3 +41,12 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+      - name: Bölge tarama kuyruğu (kullanıcı istekleri — saatlik tetikte)
+        if: github.event.schedule == '30 * * * *' || github.event_name == 'workflow_dispatch'
+        working-directory: bot
+        run: python scan_worker.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
