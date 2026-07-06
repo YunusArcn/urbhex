@@ -154,4 +154,17 @@ async def run() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(run())
+    import sys
+
+    if "--loop" in sys.argv:
+        # Gelistirme modu: kuyrugu 20 sn'de bir isler — uygulamadaki
+        # "Bu bolgede haber tara" butonu aninda sonuc verir.
+        async def _loop() -> None:
+            print("[scan_worker] Döngü modu: kuyruk 20 sn'de bir kontrol ediliyor (Ctrl+C ile çık).")
+            while True:
+                await run()
+                await asyncio.sleep(20)
+
+        asyncio.run(_loop())
+    else:
+        asyncio.run(run())

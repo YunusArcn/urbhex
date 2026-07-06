@@ -20,6 +20,9 @@ class Incident {
   final DateTime occurredOn;
   final String eventType;
   final String summary;
+  final String district;
+  final double lat;
+  final double lng;
   final List<String> sourceUrls;
 
   const Incident({
@@ -27,6 +30,9 @@ class Incident {
     required this.occurredOn,
     required this.eventType,
     required this.summary,
+    required this.district,
+    required this.lat,
+    required this.lng,
     required this.sourceUrls,
   });
 
@@ -35,6 +41,9 @@ class Incident {
         occurredOn: DateTime.parse(json['occurred_on'] as String),
         eventType: json['event_type'] as String,
         summary: json['summary'] as String,
+        district: json['district'] as String? ?? '',
+        lat: (json['lat'] as num?)?.toDouble() ?? 0,
+        lng: (json['lng'] as num?)?.toDouble() ?? 0,
         sourceUrls: List<String>.from(json['source_urls'] as List),
       );
 

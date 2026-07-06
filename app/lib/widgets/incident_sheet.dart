@@ -16,7 +16,8 @@ import 'ad_card.dart';
 ///  - Araya dogal reklam kartlari girer (2 tur grubunda bir)
 class IncidentSheet extends StatefulWidget {
   final HexScore hex;
-  const IncidentSheet({super.key, required this.hex});
+  final int sinceDays; // haritadaki tarih filtresine uyar
+  const IncidentSheet({super.key, required this.hex, this.sinceDays = 36500});
 
   @override
   State<IncidentSheet> createState() => _IncidentSheetState();
@@ -39,7 +40,8 @@ class _IncidentSheetState extends State<IncidentSheet> {
     // Panel tur gruplari gosterdigi icin olaylar tek seferde cekilir (hex
     // basina olay sayisi sinirli; sayfalama tur ici listede gerekirse V2'de).
     final results = await Future.wait([
-      _service.incidentsInHex(widget.hex.h3Res9, page: 0, pageSize: 200),
+      _service.incidentsInHex(widget.hex.h3Res9,
+          sinceDays: widget.sinceDays, page: 0, pageSize: 200),
       _favorites.isFavorite(widget.hex.h3Res9),
     ]);
     if (!mounted) return;

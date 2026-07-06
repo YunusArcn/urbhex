@@ -34,8 +34,11 @@ class _AuthScreenState extends State<AuthScreen> {
         if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
-      setState(() => _message = 'Hata: e-posta/şifre kontrol et. '
-          'Kayıt olduysan önce e-postanı doğrula.');
+      // Gercek nedeni goster (ornek: "Email not confirmed", "Invalid login credentials").
+      final raw = e.toString();
+      final detail = raw.length > 140 ? raw.substring(0, 140) : raw;
+      setState(() => _message = 'Giriş başarısız: $detail\n'
+          'İpucu: kayıt olduysan önce e-postandaki doğrulama linkine tıkla.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -28,7 +28,8 @@ class HexUtils {
   /// PDR kurali: seffaf %40-50 dolgu, sokaklar altigenin arkasindan gorunur.
   static Color fillColor(int safetyScore) {
     final t = (safetyScore.clamp(1, 100) - 1) / 99.0; // 0 = riskli, 1 = guvenli
-    return HSVColor.fromAHSV(0.45, 120.0 * t, 0.85, 0.90).toColor();
+    // "Bulutlu" isi haritasi: dusuk opaklik + yumusak doygunluk, kenar cizgisi yok.
+    return HSVColor.fromAHSV(0.28, 120.0 * t, 0.70, 0.95).toColor();
   }
 
   /// Kume rozeti rengi: kumedeki ortalama skora gore.

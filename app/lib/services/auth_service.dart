@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Kimlik islemleri: Google OAuth + e-posta/sifre (dogrulama mailli).
@@ -8,14 +9,20 @@ class AuthService {
   bool get isLoggedIn => currentUser != null;
   Stream<AuthState> get onAuthChange => _client.auth.onAuthStateChange;
 
-  /// Google ile giris — Supabase yonlendirmeli OAuth (web'de yeni sekme acilir).
-  Future<void> signInWithGoogle() =>
-      _client.auth.signInWithOAuth(OAuthProvider.google);
+  /// Web'de giris/dogrulama sonrasi DONULECEK adres: o an calisilan origin.
+  /// (Gelistirmede http://localhost:3000, canlida https://urbhex.com —
+  ///  boylece Supabase'in Site URL'i ne olursa olsun dogru yere donulur.
+  ///  Adresin Supabase > Auth > URL Configuration'da izinli olmasi gerekir.)
+  String? get _redirect => kIsWeb ? Uri.base.origin : null;
+
+  /// Google ile giris — Supabase yonlendirmeli OAuth (sayfa yonlenir, geri gelir).
+  Future<void> signInWithGoogle() => _client.auth
+      .signInWithOAuth(OAuthProvider.google, redirectTo: _redirect);
 
   /// Kayit: Supabase dogrulama e-postasi gonderir; kullanici onaylayana
   /// kadar oturum acilmaz (Dashboard'da "Confirm email" acik olmali).
-  Future<void> signUp(String email, String password) =>
-      _client.auth.signUp(email: email, password: password);
+  Future<void> signUp(String email, String password) => _client.auth
+      .signUp(email: email, password: password, emailRedirectTo: _redirect);
 
   Future<void> signIn(String email, String password) =>
       _client.auth.signInWithPassword(email: email, password: password);
