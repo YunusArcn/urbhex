@@ -24,11 +24,73 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _registerMode = false;
   bool _busy = false;
   bool _obscure = true;
+  bool _termsAccepted = false;
   String? _error;
   String? _info;
 
+  static const _termsText = '''
+SORUMLULUK REDDİ BEYANI
+
+1. Urbhex, yalnızca kamuya açık haber kaynaklarında YAYIMLANMIŞ içerikleri
+otomatik olarak toplayıp harita üzerinde görselleştiren bir platformdur.
+Haber üretmez, haberleri doğrulamaz; içeriğin doğruluğu kaynak sitelere aittir.
+
+2. Bir bölge için gösterilen veriler, o bölgeyle ilgili ERİŞİLEBİLEN
+haberlerle sınırlıdır ve gerçek olay sayısını tam yansıtmayabilir. Haritada
+haber görünmemesi "olay yaşanmadığı" anlamına gelmez; haber görünmesi tek
+başına "bölge güvensizdir" anlamına gelmez.
+
+3. Güvenlik skorları, haber verisinden üretilen İSTATİSTİKSEL göstergelerdir;
+kesinlik veya garanti içermez.
+
+4. Platformdaki hiçbir içerik emlak, yatırım, taşınma, kiralama veya kişisel
+güvenlik TAVSİYESİ değildir. Platformun tek amacı yayımlanmış haberleri
+harita üzerinde görünür kılmaktır. Bu bilgilere dayanarak alınan her türlü
+karar ve sonuçları münhasıran KULLANICIYA aittir.
+
+5. Olay konumları, kişisel veri içermeyecek şekilde yaklaşık bölge (altıgen)
+merkezine yerleştirilir; açık adres ve kişi bilgisi saklanmaz (KVKK).
+
+6. Urbhex; verilerin kullanımından doğabilecek doğrudan veya dolaylı hiçbir
+zarardan sorumlu tutulamaz. Ayrıntı için her olay kartındaki orijinal haber
+kaynağına başvurunuz.
+
+Kayıt olarak bu beyanı okuduğunuzu ve kabul ettiğinizi onaylarsınız.''';
+
+  void _showTerms() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Sorumluluk Reddi Beyanı'),
+        content: const SizedBox(
+          width: 480,
+          child: SingleChildScrollView(
+            child: Text(_termsText, style: TextStyle(fontSize: 13, height: 1.45)),
+          ),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Kapat')),
+          FilledButton(
+            onPressed: () {
+              setState(() => _termsAccepted = true);
+              Navigator.pop(context);
+            },
+            child: const Text('Okudum, kabul ediyorum'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_registerMode && !_termsAccepted) {
+      setState(() => _error =
+          'Kayıt için Sorumluluk Reddi Beyanı\'nı okuyup onaylaman gerekiyor.');
+      return;
+    }
     setState(() {
       _busy = true;
       _error = null;
@@ -197,6 +259,34 @@ class _AuthScreenState extends State<AuthScreen> {
                       validator: (v) =>
                           v != _password.text ? 'Şifreler aynı değil' : null,
                     ),
+                    const SizedBox(height: 10),
+                    // Yasal onay: beyan okunup kabul edilmeden kayit olmaz.
+                    Row(children: [
+                      Checkbox(
+                        value: _termsAccepted,
+                        onChanged: (v) =>
+                            setState(() => _termsAccepted = v ?? false),
+                      ),
+                      Expanded(
+                        child: Wrap(
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: _showTerms,
+                              child: const Text(
+                                'Sorumluluk Reddi Beyanı\'nı',
+                                style: TextStyle(
+                                  color: Color(0xFF1B5E20),
+                                  fontWeight: FontWeight.bold,
+                                  decoration: TextDecoration.underline,
+                                ),
+                              ),
+                            ),
+                            const Text(' okudum, kabul ediyorum.'),
+                          ],
+                        ),
+                      ),
+                    ]),
                   ],
                   const SizedBox(height: 18),
 

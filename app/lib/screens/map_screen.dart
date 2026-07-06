@@ -53,7 +53,9 @@ class _MapScreenState extends State<MapScreen> {
   List<Incident> _visibleIncidents = [];
   int _unread = 0;
   List<(String, LatLng)> _suggestions = [];
-  int _sinceDays = 365;
+  int _sinceDays = 3; // varsayılan: Son 3 gün
+  bool _filterPinned = false; // kullanıcı elle seçtiyse otomatik genişletme yok
+  bool _detailedTiles = false; // false = sakin (Normal), true = Ayrıntılı (OSM)
   bool _panelOpen = true;
   bool _scanning = false;
   double _zoom = 13;
@@ -122,9 +124,27 @@ class _MapScreenState extends State<MapScreen> {
         _hexes = results[0] as List<HexScore>;
         _visibleIncidents = results[1] as List<Incident>;
       });
+      _maybeExpandPeriod();
     } catch (e) {
       debugPrint('veri yukleme hatasi: $e');
     }
+  }
+
+  /// Varsayilan "Son 3 gun" bos kalirsa donemi otomatik genislet
+  /// (kullanici filtreyi ELLE sectiyse dokunma).
+  static const _expandChain = [3, 30, 365, 36500];
+
+  void _maybeExpandPeriod() {
+    if (_filterPinned || _hexes.isNotEmpty || _visibleIncidents.isNotEmpty) {
+      return;
+    }
+    final i = _expandChain.indexOf(_sinceDays);
+    if (i < 0 || i >= _expandChain.length - 1) return;
+    final next = _expandChain[i + 1];
+    final label = _dateFilters.firstWhere((f) => f.days == next).label;
+    setState(() => _sinceDays = next);
+    _toast('Bu dönemde olay yok — "$label" gösteriliyor.');
+    _reloadData();
   }
 
   void _onMapMoved(MapEvent event) {
@@ -252,10 +272,11 @@ class _MapScreenState extends State<MapScreen> {
             },
           ),
           children: [
-            // Sade/pastel altlik: isi katmani one ciksin, harita sakin dursun.
+            // Normal: sade/pastel altlik (goz yormaz). Ayrintili: klasik OSM.
             TileLayer(
-              urlTemplate:
-                  'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
+              urlTemplate: _detailedTiles
+                  ? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                  : 'https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.urbhex.app',
             ),
             PolygonLayer(
@@ -570,11 +591,13 @@ class _MapScreenState extends State<MapScreen> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             _buildDateFilter(ff),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
+            _buildStyleToggle(ff),
+            const SizedBox(width: 6),
             _buildBellButton(ff),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             _buildProfileButton(ff),
           ]),
         ]),
@@ -593,7 +616,10 @@ class _MapScreenState extends State<MapScreen> {
         tooltip: 'Tarih filtresi',
         initialValue: _sinceDays,
         onSelected: (days) {
-          setState(() => _sinceDays = days);
+          setState(() {
+            _sinceDays = days;
+            _filterPinned = true; // elle secim: otomatik genisletme devre disi
+          });
           _reloadData();
         },
         itemBuilder: (_) => [
@@ -602,15 +628,39 @@ class _MapScreenState extends State<MapScreen> {
         ],
         child: Padding(
           padding: EdgeInsets.symmetric(
-              horizontal: 12 * ff.scale, vertical: 12 * ff.scale),
+              horizontal: 10 * ff.scale, vertical: 9 * ff.scale),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.calendar_month, size: 18),
+            const Icon(Icons.calendar_month, size: 17),
             if (ff != FormFactor.mobile) ...[
               const SizedBox(width: 6),
               Text(current, style: const TextStyle(fontSize: 13)),
             ],
             const Icon(Icons.arrow_drop_down, size: 18),
           ]),
+        ),
+      ),
+    );
+  }
+
+  /// Harita stili: Normal (pastel, sakin) ↔ Ayrintili (klasik OSM).
+  Widget _buildStyleToggle(FormFactor ff) {
+    return Material(
+      elevation: 4,
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => setState(() => _detailedTiles = !_detailedTiles),
+        child: Tooltip(
+          message: _detailedTiles
+              ? 'Harita: Ayrıntılı — sakin görünüme geç'
+              : 'Harita: Normal — ayrıntılı görünüme geç',
+          child: Padding(
+            padding: EdgeInsets.all(8 * ff.scale),
+            child: Icon(
+              _detailedTiles ? Icons.layers : Icons.layers_outlined,
+              size: 20 * ff.scale,
+            ),
+          ),
         ),
       ),
     );
@@ -625,11 +675,11 @@ class _MapScreenState extends State<MapScreen> {
         customBorder: const CircleBorder(),
         onTap: _showNotifications,
         child: Padding(
-          padding: EdgeInsets.all(10 * ff.scale),
+          padding: EdgeInsets.all(8 * ff.scale),
           child: Badge(
             isLabelVisible: _unread > 0,
             label: Text('$_unread'),
-            child: Icon(Icons.notifications_outlined, size: 24 * ff.scale),
+            child: Icon(Icons.notifications_outlined, size: 20 * ff.scale),
           ),
         ),
       ),
@@ -738,13 +788,14 @@ class _MapScreenState extends State<MapScreen> {
           if (mounted) setState(() {});
         },
         child: CircleAvatar(
-          radius: 22 * ff.scale,
+          radius: 17 * ff.scale,
           backgroundColor:
               user == null ? Colors.grey.shade200 : const Color(0xFF1B5E20),
           child: user == null
-              ? const Icon(Icons.person_outline, color: Colors.black54)
+              ? Icon(Icons.person_outline,
+                  color: Colors.black54, size: 18 * ff.scale)
               : Text((user.email ?? 'U')[0].toUpperCase(),
-                  style: const TextStyle(color: Colors.white)),
+                  style: TextStyle(color: Colors.white, fontSize: 14 * ff.scale)),
         ),
       ),
     );

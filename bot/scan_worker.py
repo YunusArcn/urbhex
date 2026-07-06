@@ -50,9 +50,16 @@ def detect_city(lat: float, lng: float) -> str | None:
     return addr.get("province") or addr.get("state") or addr.get("city")
 
 
-def fetch_google_news(city: str) -> list[dict]:
-    """Google News RSS: ilin son asayiş haberleri (başlık, link, tarih, özet)."""
-    query = f'"{city}" (cinayet OR gasp OR hırsızlık OR kavga OR yaralandı OR "trafik kazası" OR uyuşturucu OR "silahlı saldırı") when:7d'
+def fetch_google_news(city: str, query: str | None = None, days: int = 7) -> list[dict]:
+    """Google News RSS: ilin asayiş haberleri (başlık, link, tarih, özet).
+
+    query verilmezse genel asayiş sorgusu kurulur; backfill_city.py anahtar
+    kelime bazlı özel sorgular geçirir (RSS'in ~100 sonuç tavanını aşmak için).
+    """
+    query = query or (
+        f'"{city}" (cinayet OR gasp OR hırsızlık OR kavga OR yaralandı '
+        f'OR "trafik kazası" OR uyuşturucu OR "silahlı saldırı") when:{days}d'
+    )
     url = ("https://news.google.com/rss/search?q="
            f"{urllib.parse.quote(query)}&hl=tr&gl=TR&ceid=TR:tr")
     root = ET.fromstring(_http_get(url))

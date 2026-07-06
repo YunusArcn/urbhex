@@ -15,7 +15,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-import h3
+import h3compat as h3
 
 from config import H3_RES_COARSE, H3_RES_FINE, H3_RES_POP
 
