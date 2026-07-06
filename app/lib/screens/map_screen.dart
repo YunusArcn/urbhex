@@ -24,7 +24,11 @@ import 'settings_screen.dart';
 /// Ana ekran: sakin (bulutlu) isi haritasi + tarih filtresi + sol haber paneli
 /// + oneri getiren arama + bolge tarama (kuyruk + canli bekleme).
 class MapScreen extends StatefulWidget {
-  const MapScreen({super.key});
+  /// Onboarding amacina gore baslangic gorunumu:
+  /// tasinma → ayrintili altlik; haber → sade + panel acik.
+  final bool startDetailed;
+  final bool? startPanelOpen;
+  const MapScreen({super.key, this.startDetailed = false, this.startPanelOpen});
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -40,8 +44,10 @@ const _dateFilters = [
   (label: 'Tümü', days: 36500),
 ];
 
-class _MapScreenState extends State<MapScreen> {
+class _MapScreenState extends State<MapScreen>
+    with SingleTickerProviderStateMixin {
   static const _izmitCenter = LatLng(40.7654, 29.9408);
+  static const _turkiyeOverview = LatLng(39.2, 34.9); // sinematik baslangic
   static const _detailZoom = 13.0;
 
   final _service = SupabaseService();
@@ -57,8 +63,11 @@ class _MapScreenState extends State<MapScreen> {
   List<(String, LatLng)> _suggestions = [];
   int _sinceDays = 3; // varsayılan: Son 3 gün
   bool _filterPinned = false; // kullanıcı elle seçtiyse otomatik genişletme yok
-  bool _detailedTiles = false; // false = sakin (Normal), true = Ayrıntılı (OSM)
+  late bool _detailedTiles = widget.startDetailed;
   bool _panelOpen = true;
+  bool _introRunning = true; // sinematik yaklasma bitene kadar veri cekme
+  late final AnimationController _introCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 2800));
   bool _scanning = false;
   double _zoom = 13;
   Timer? _debounce;
@@ -70,8 +79,9 @@ class _MapScreenState extends State<MapScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showDisclaimer();
-      _panelOpen = formFactorOf(context) != FormFactor.mobile;
-      _startFromUserLocation();
+      _panelOpen =
+          widget.startPanelOpen ?? (formFactorOf(context) != FormFactor.mobile);
+      _runCinematicIntro();
     });
     _auth.onAuthChange.listen((_) {
       if (mounted) {
@@ -91,6 +101,36 @@ class _MapScreenState extends State<MapScreen> {
         _profile = profile;
       });
     }
+  }
+
+  /// Sinematik karsilama: harita Turkiye genelinden kullanicinin bolgesine
+  /// yumusak bir egriyle suzulerek yaklasir (logo animasyonunun yerini aldi).
+  Future<void> _runCinematicIntro() async {
+    final target = await LocationService.currentPosition() ?? _izmitCenter;
+    if (!mounted) return;
+    const startZoom = 5.2;
+    const endZoom = 13.5;
+    final anim =
+        CurvedAnimation(parent: _introCtrl, curve: Curves.easeInOutCubic);
+    void tick() {
+      final t = anim.value;
+      _mapController.move(
+        LatLng(
+          _turkiyeOverview.latitude +
+              (target.latitude - _turkiyeOverview.latitude) * t,
+          _turkiyeOverview.longitude +
+              (target.longitude - _turkiyeOverview.longitude) * t,
+        ),
+        startZoom + (endZoom - startZoom) * t,
+      );
+    }
+
+    anim.addListener(tick);
+    await _introCtrl.forward();
+    anim.removeListener(tick);
+    _introRunning = false;
+    _zoom = endZoom;
+    _reloadData();
   }
 
   Future<void> _startFromUserLocation() async {
@@ -156,6 +196,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onMapMoved(MapEvent event) {
+    if (_introRunning) return; // yaklasma sirasinda veri cekme/spam yok
     _zoom = _mapController.camera.zoom;
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _reloadData);
@@ -271,8 +312,8 @@ class _MapScreenState extends State<MapScreen> {
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
-            initialCenter: _izmitCenter,
-            initialZoom: 13,
+            initialCenter: _turkiyeOverview,
+            initialZoom: 5.2,
             onMapEvent: _onMapMoved,
             onTap: (_, point) {
               setState(() => _suggestions = []);
@@ -820,6 +861,7 @@ class _MapScreenState extends State<MapScreen> {
     _debounce?.cancel();
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _introCtrl.dispose();
     super.dispose();
   }
 }
