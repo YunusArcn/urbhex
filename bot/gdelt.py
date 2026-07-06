@@ -99,7 +99,7 @@ def _store(incidents: list[dict]) -> dict:
         url = inc["source_urls"][0]
         if url in known:
             continue
-        candidates = db.find_dedup_candidates(inc["occurred_on"], inc["h3_res9"], inc["event_type"])
+        candidates = db.find_dedup_candidates(inc["occurred_on"], inc["h3_res7"], inc["event_type"])
         if candidates:
             db.append_source(candidates[0]["id"], candidates[0]["source_urls"], url)
             stats["birlestirildi"] += 1

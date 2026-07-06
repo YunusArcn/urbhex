@@ -33,14 +33,23 @@ def report_unmatched(url: str, source: str, reason: str) -> None:
     ).execute()
 
 
-def find_dedup_candidates(occurred_on: str, h3_res9: str, event_type: str) -> list[dict]:
-    """Birincil filtre: aynı gün + aynı hex + aynı tür."""
+def find_dedup_candidates(occurred_on: str, h3_res7: str, event_type: str) -> list[dict]:
+    """Birincil filtre: ±1 gün + aynı res-7 bölge (~5 km2) + aynı tür.
+
+    (İki site aynı olayı bir gün arayla ve farklı mahalleyle verebiliyor;
+    dar res-9 + tek-gün eşitliği mükerrer kayıtlara yol açıyordu. Geniş filtre
+    adayları bulur, benzerlik/anlamsal karşılaştırma son kararı verir.)
+    """
+    from datetime import date, timedelta
+
+    d = date.fromisoformat(occurred_on)
     return (
         get_client()
         .table("incidents")
         .select("id, summary, source_urls")
-        .eq("occurred_on", occurred_on)
-        .eq("h3_res9", h3_res9)
+        .gte("occurred_on", (d - timedelta(days=1)).isoformat())
+        .lte("occurred_on", (d + timedelta(days=1)).isoformat())
+        .eq("h3_res7", h3_res7)
         .eq("event_type", event_type)
         .execute()
         .data

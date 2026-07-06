@@ -1,0 +1,43 @@
+# URBHEX botu — GitHub Actions ile bulutta ÜCRETSİZ zamanlı çalıştırma.
+# Kurulum: repo'yu GitHub'a push'la → Settings → Secrets and variables → Actions →
+# şu 3 secret'ı ekle: SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY
+# (Actions sekmesinden "Run workflow" ile elle de tetiklenebilir.)
+name: urbhex-bot
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"   # yerel kaynak taraması: 6 saatte bir
+    - cron: "30 * * * *"    # GDELT global: saatte bir
+  workflow_dispatch: {}
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: bot/requirements.txt
+
+      - run: pip install -r bot/requirements.txt
+
+      - name: Yerel kaynak taraması (6 saatlik tetikte)
+        if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
+        working-directory: bot
+        run: python main.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: GDELT global tarama (saatlik tetikte)
+        if: github.event.schedule == '30 * * * *' || github.event_name == 'workflow_dispatch'
+        working-directory: bot
+        run: python gdelt.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

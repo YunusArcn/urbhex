@@ -5,6 +5,7 @@ Zamanlama: cron / systemd timer ile 6 saatte bir çalıştırılır:
     0 */6 * * * cd /opt/urbhex/bot && python main.py
 """
 import asyncio
+from difflib import SequenceMatcher
 
 import db
 import geo
@@ -32,9 +33,11 @@ def process_article(article) -> str:
 
     occurred = parsed.tarih.isoformat()
 
-    # Tekilleştirme — 1. birincil filtre, 2. anlamsal eşleştirme, 3. kaynak dizisi
-    for candidate in db.find_dedup_candidates(occurred, hex_info["h3_res9"], parsed.olay_turu):
-        if is_same_incident(candidate["summary"], parsed.kisa_ozet):
+    # Tekilleştirme — 1. geniş filtre (±1 gün, res-7), 2. benzerlik, 3. kaynak dizisi
+    # difflib ücretsizdir: çok benzer → AI'sız birleştir; orta benzer → AI'a sor.
+    for candidate in db.find_dedup_candidates(occurred, hex_info["h3_res7"], parsed.olay_turu):
+        ratio = SequenceMatcher(None, candidate["summary"], parsed.kisa_ozet).ratio()
+        if ratio >= 0.65 or (ratio >= 0.35 and is_same_incident(candidate["summary"], parsed.kisa_ozet)):
             db.append_source(candidate["id"], candidate["source_urls"], article.url)
             return "birlestirildi"
 

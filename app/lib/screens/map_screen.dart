@@ -4,10 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import 'package:url_launcher/url_launcher.dart';
+
 import '../models/hex_score.dart';
 import '../models/incident.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
+import '../services/scan_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/hex_utils.dart';
 import '../utils/responsive.dart';
@@ -32,8 +35,11 @@ class _MapScreenState extends State<MapScreen> {
 
   final _service = SupabaseService();
   final _auth = AuthService();
+  final _scanService = ScanService();
   final _mapController = MapController();
   List<HexScore> _hexes = [];
+  List<ScanResult> _scanResults = [];
+  bool _scanning = false;
   double _zoom = 13;
   Timer? _debounce;
   bool _disclaimerShown = false;
@@ -127,38 +133,158 @@ class _MapScreenState extends State<MapScreen> {
               MarkerLayer(markers: _eventIconMarkers(ff)),
             ] else
               MarkerLayer(markers: _clusterMarkers(ff)),
+            if (_scanResults.isNotEmpty)
+              MarkerLayer(markers: _scanMarkers(ff)),
           ],
         ),
         _buildTopBar(ff),
       ]),
-      floatingActionButton: FloatingActionButton.small(
-        tooltip: 'Konumuma git',
-        onPressed: _startFromUserLocation,
-        child: const Icon(Icons.my_location),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'scan',
+            onPressed: _scanning ? null : _scanVisibleArea,
+            icon: _scanning
+                ? const SizedBox(
+                    height: 18, width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.radar),
+            label: Text(_scanning ? 'Taranıyor...' : 'Bu bölgede haber tara'),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton.small(
+            heroTag: 'loc',
+            tooltip: 'Konumuma git',
+            onPressed: _startFromUserLocation,
+            child: const Icon(Icons.my_location),
+          ),
+        ],
       ),
     );
   }
 
-  /// Yakin zoom: her hex'in merkezine baskin olay turunun ikonu.
+  /// Ekranda gorunen alanin guncel haberlerini GDELT'ten ANLIK ceker.
+  Future<void> _scanVisibleArea() async {
+    setState(() => _scanning = true);
+    final b = _mapController.camera.visibleBounds;
+    // Kuyruga da yaz: bot bu bolgeyi sonraki turda kalici olarak isler.
+    _service
+        .requestScan(
+            minLat: b.south, minLng: b.west, maxLat: b.north, maxLng: b.east)
+        .catchError((_) {});
+    try {
+      final results = await _scanService.scanBbox(
+        minLat: b.south, minLng: b.west, maxLat: b.north, maxLng: b.east,
+      );
+      if (!mounted) return;
+      setState(() => _scanResults = results);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(results.isEmpty
+            ? 'Bu alanda son 7 günde uluslararası basına yansıyan olay yok.'
+            : '${results.length} haber noktası bulundu (mavi işaretler — son 7 gün).'),
+      ));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tarama başarısız — tekrar dene.')));
+      }
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
+
+  /// Anlik tarama sonuclari: mavi haber pinleri (gecici katman).
+  List<Marker> _scanMarkers(FormFactor ff) {
+    final size = 34.0 * ff.scale;
+    return [
+      for (final r in _scanResults)
+        Marker(
+          point: LatLng(r.lat, r.lng),
+          width: size,
+          height: size,
+          child: GestureDetector(
+            onTap: () => _showScanResult(r),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.blue.shade700,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+              child: const Icon(Icons.newspaper, color: Colors.white, size: 16),
+            ),
+          ),
+        ),
+    ];
+  }
+
+  void _showScanResult(ScanResult r) {
+    showDialog(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: Text('${r.name} — ${r.count} haber'),
+        children: [
+          if (r.urls.isEmpty)
+            const Padding(
+                padding: EdgeInsets.all(16), child: Text('Link bulunamadı.')),
+          for (final url in r.urls)
+            SimpleDialogOption(
+              child: Text(Uri.parse(url).host,
+                  style: const TextStyle(color: Colors.blue)),
+              onPressed: () =>
+                  launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Yakin zoom: her hex'in merkezine baskin olay ikonu + ANLIK SKOR rozeti.
   /// Ikon boyutlari cihaza gore oranlanir (telefon/tablet/pc).
   List<Marker> _eventIconMarkers(FormFactor ff) {
-    final size = 30.0 * ff.scale;
+    final w = 34.0 * ff.scale;
+    final h = 48.0 * ff.scale;
     return [
       for (final hex in _hexes)
         Marker(
           point: LatLng(hex.lat, hex.lng),
-          width: size,
-          height: size,
+          width: w,
+          height: h,
           child: GestureDetector(
             onTap: () => _onHexTapped(hex),
-            child: CircleAvatar(
-              backgroundColor: Colors.white.withOpacity(0.9),
-              child: Icon(
-                eventTypeIcon(hex.topEventType),
-                size: 17 * ff.scale,
-                color: HexUtils.clusterColor(hex.safetyScore),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Container(
+                width: 28 * ff.scale,
+                height: 28 * ff.scale,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: HexUtils.clusterColor(hex.safetyScore), width: 2),
+                ),
+                child: Icon(
+                  eventTypeIcon(hex.topEventType),
+                  size: 15 * ff.scale,
+                  color: HexUtils.clusterColor(hex.safetyScore),
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 5 * ff.scale),
+                decoration: BoxDecoration(
+                  color: HexUtils.clusterColor(hex.safetyScore),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${hex.safetyScore}',
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10 * ff.scale,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ]),
           ),
         ),
     ];
@@ -182,7 +308,9 @@ class _MapScreenState extends State<MapScreen> {
             members.fold(0.0, (s, h) => s + h.lat) / members.length,
             members.fold(0.0, (s, h) => s + h.lng) / members.length,
           );
-          final base = total > 99 ? 52.0 : (total > 20 ? 44.0 : 36.0);
+          // Rozetler kucultuldu + beyaz cerceve eklendi: komsu kumeler
+          // uzak zoomda ust uste binince bile ayirt edilebiliyor.
+          final base = total > 99 ? 44.0 : (total > 20 ? 38.0 : 30.0);
           final size = base * ff.scale;
           return Marker(
             point: center,
@@ -190,13 +318,18 @@ class _MapScreenState extends State<MapScreen> {
             height: size,
             child: GestureDetector(
               onTap: () => _mapController.move(center, _detailZoom + 0.5),
-              child: CircleAvatar(
-                backgroundColor: HexUtils.clusterColor(avgScore),
+              child: Container(
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: HexUtils.clusterColor(avgScore),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
                 child: Text('$total',
                     style: TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 13 * ff.scale)),
+                        fontSize: 12 * ff.scale)),
               ),
             ),
           );
