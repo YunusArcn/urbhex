@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
   <!--
     If you are serving your web app in a path other than the root, change the
@@ -18,7 +18,43 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="Urbhex - Mahalle guvenlik ve yasanabilirlik endeksi">
+
+  <!-- ============ SEO ============ -->
+  <meta name="description" content="Taşınmadan önce mahallenin güvenlik skorunu gör. Türkiye asayiş ve suç haritası: hırsızlık, trafik kazası ve olay yoğunluğu sokak sokak, haber kaynaklı ve güncel.">
+  <meta name="keywords" content="mahalle güvenlik haritası, güvenli mahalleler, suç haritası, asayiş haritası, mahalle güvenlik skoru, taşınmadan önce mahalle araştırma, yaşanabilirlik endeksi, semt güvenliği, ev alırken güvenli bölge, kiralık ev güvenli mahalle, İzmit güvenli mahalleler, Kocaeli asayiş, bölge analizi, emlak bölge raporu">
+  <link rel="canonical" href="https://urbhex.com/">
+  <meta name="robots" content="index, follow">
+
+  <!-- Open Graph (WhatsApp/Facebook/LinkedIn paylasim karti) -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Urbhex">
+  <meta property="og:title" content="Urbhex — Mahalle Güvenlik Haritası ve Yaşanabilirlik Endeksi">
+  <meta property="og:description" content="Taşınmadan önce mahallenin güvenlik skorunu gör. Sokak sokak asayiş haritası: hırsızlık, kaza ve olay yoğunluğu, haber kaynaklı ve güncel.">
+  <meta property="og:url" content="https://urbhex.com/">
+  <meta property="og:image" content="https://urbhex.com/icons/Icon-512.png">
+  <meta property="og:locale" content="tr_TR">
+
+  <!-- Twitter/X karti -->
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Urbhex — Mahalle Güvenlik Haritası">
+  <meta name="twitter:description" content="Taşınmadan önce mahallenin güvenlik skorunu gör. Sokak sokak asayiş ve yaşanabilirlik haritası.">
+  <meta name="twitter:image" content="https://urbhex.com/icons/Icon-512.png">
+
+  <!-- Yapilandirilmis veri: Google sonuclarinda zengin gosterim -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Urbhex",
+    "alternateName": "Mahalle Güvenlik Haritası",
+    "url": "https://urbhex.com/",
+    "description": "Türkiye mahalle güvenlik haritası ve yaşanabilirlik endeksi. Taşınmadan veya ev almadan önce bölgenin asayiş durumunu sokak seviyesinde görün.",
+    "applicationCategory": "UtilitiesApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "tr",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "TRY" }
+  }
+  </script>
 
   <!-- ============ PostHog Analitik (ucretsiz, 1M olay/ay) ============
        Kurulum: eu.posthog.com'da ucretsiz hesap ac -> proje olustur ->
@@ -43,7 +79,7 @@
        urbhex.com -> "Olcum Kimligi"ni (G-XXXXXXXXXX) kopyala ve asagidaki
        __GA4_ID__ yerine yapistir. Girilmezse GA sessizce devre disi kalir. -->
   <script>
-    var GA_ID = "__GA4_ID__";
+    var GA_ID = "G-YP43XDJL51";
     if (GA_ID.indexOf("G-") === 0) {
       var gs = document.createElement("script");
       gs.async = true;
@@ -65,10 +101,21 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>urbhex</title>
+  <title>Urbhex — Mahalle Güvenlik Haritası ve Yaşanabilirlik Endeksi</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- Arama motorlari ve JS'siz tarayicilar icin okunabilir icerik.
+       Flutter tuvale cizdigi icin botlarin gorebildigi tek metin budur. -->
+  <noscript>
+    <h1>Urbhex — Mahalle Güvenlik Haritası ve Yaşanabilirlik Endeksi</h1>
+    <p>Taşınmadan, ev almadan veya kiralamadan önce mahallenin güvenlik
+    skorunu görün. Urbhex; hırsızlık, gasp, trafik kazası ve diğer asayiş
+    olaylarını yerel haber kaynaklarından toplayıp sokak seviyesinde
+    haritalandırır. Güvenli mahalleler, suç haritası ve bölge analizi tek
+    haritada: İzmit, Kocaeli ve tüm Türkiye. Uygulama ücretsizdir; bölgenizi
+    favorileyip gelişmeleri takip edebilirsiniz.</p>
+  </noscript>
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader
