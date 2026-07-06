@@ -9,6 +9,7 @@ import '../services/favorites_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/responsive.dart';
 import 'ad_card.dart';
+import 'livability_panel.dart';
 
 /// Bolge detay paneli:
 ///  - Guvenlik skoru + favori (kalp) butonu
@@ -30,6 +31,7 @@ class _IncidentSheetState extends State<IncidentSheet> {
   List<Incident> _incidents = [];
   bool _loading = true;
   bool _isFav = false;
+  int _tab = 0; // 0 = Olaylar, 1 = Yasam & Ulasim
 
   @override
   void initState() {
@@ -151,10 +153,29 @@ class _IncidentSheetState extends State<IncidentSheet> {
     final ff = formFactorOf(context);
     final content = Column(children: [
       _buildHeader(ff),
+      // Sekmeler: guvenlik olaylari ↔ bolgenin yasam/ulasim olanaklari
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: SegmentedButton<int>(
+          segments: const [
+            ButtonSegment(
+                value: 0, label: Text('Olaylar'), icon: Icon(Icons.gavel)),
+            ButtonSegment(
+                value: 1,
+                label: Text('Yaşam & Ulaşım'),
+                icon: Icon(Icons.emoji_transportation)),
+          ],
+          selected: {_tab},
+          onSelectionChanged: (s) => setState(() => _tab = s.first),
+        ),
+      ),
+      const SizedBox(height: 6),
       Expanded(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : _buildGroupedList(ff),
+        child: _tab == 1
+            ? LivabilityPanel(lat: widget.hex.lat, lng: widget.hex.lng)
+            : _loading
+                ? const Center(child: CircularProgressIndicator())
+                : _buildGroupedList(ff),
       ),
     ]);
 

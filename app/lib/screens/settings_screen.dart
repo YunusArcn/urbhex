@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/favorites_service.dart';
 import '../services/notifications_service.dart';
+import '../widgets/tier_avatar.dart';
 
 /// Ayarlar: profil, kayitli konumlar (Ev/Is + Guvenlik Alarmi) ve bildirimler.
 class SettingsScreen extends StatefulWidget {
@@ -17,7 +18,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _favorites = FavoritesService();
   final _notifications = NotificationsService();
   final _nameController = TextEditingController();
-  final _avatarController = TextEditingController();
+  String _avatarValue = ''; // "preset:N"
+  String _tier = 'bronz';
   List<Map<String, dynamic>> _favs = [];
   List<Map<String, dynamic>> _notifs = [];
   bool _saving = false;
@@ -35,7 +37,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() {
       _nameController.text = profile?['display_name'] ?? '';
-      _avatarController.text = profile?['avatar_url'] ?? '';
+      _avatarValue = profile?['avatar_url'] ?? '';
+      _tier = profile?['tier'] ?? 'bronz';
       _favs = favs;
       _notifs = notifs;
     });
@@ -45,7 +48,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _saving = true);
     await _auth.updateProfile(
       displayName: _nameController.text.trim(),
-      avatarUrl: _avatarController.text.trim(),
+      avatarUrl: _avatarValue,
     );
     if (mounted) {
       setState(() => _saving = false);
@@ -63,7 +66,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final user = _auth.currentUser;
-    final avatarUrl = _avatarController.text.trim();
     return Scaffold(
       appBar: AppBar(title: const Text('Ayarlar')),
       body: user == null
@@ -72,39 +74,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 Center(
-                  child: CircleAvatar(
+                  child: TierAvatar(
+                    avatarValue: _avatarValue,
+                    fallbackInitial: (_nameController.text.isNotEmpty
+                        ? _nameController.text[0]
+                        : (user.email ?? 'U')[0]),
+                    tier: _tier,
                     radius: 40,
-                    backgroundImage:
-                        avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
-                    child: avatarUrl.isEmpty
-                        ? Text(
-                            (_nameController.text.isNotEmpty
-                                    ? _nameController.text[0]
-                                    : (user.email ?? 'U')[0])
-                                .toUpperCase(),
-                            style: const TextStyle(fontSize: 28))
-                        : null,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Center(child: Text(user.email ?? '')),
-                const SizedBox(height: 24),
+                const SizedBox(height: 6),
+                Center(
+                  child: Chip(
+                    avatar: Icon(Icons.workspace_premium,
+                        size: 16, color: TierAvatar.tierColor(_tier)),
+                    label: Text(
+                      '${TierAvatar.tierLabel(_tier)} — lansmanda tüm özellikler açık',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    side: BorderSide(color: TierAvatar.tierColor(_tier)),
+                  ),
+                ),
+                const SizedBox(height: 20),
                 TextField(
                   controller: _nameController,
                   decoration: const InputDecoration(
                       labelText: 'Görünen ad', border: OutlineInputBorder()),
                 ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _avatarController,
-                  onChanged: (_) => setState(() {}),
-                  decoration: const InputDecoration(
-                    labelText: 'Profil fotoğrafı (URL)',
-                    hintText: 'https://... (boş bırakılırsa baş harfin gösterilir)',
-                    border: OutlineInputBorder(),
-                  ),
+                const SizedBox(height: 16),
+                const Text('Profil görseli seç',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                // Hazir avatar paleti — URL girisi kaldirildi (guvenlik).
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    for (var i = 0; i < TierAvatar.presets.length; i++)
+                      GestureDetector(
+                        onTap: () =>
+                            setState(() => _avatarValue = 'preset:$i'),
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              width: 2.5,
+                              color: _avatarValue == 'preset:$i'
+                                  ? TierAvatar.tierColor(_tier)
+                                  : Colors.transparent,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 22,
+                            backgroundColor: TierAvatar.presets[i].$1,
+                            child: Icon(TierAvatar.presets[i].$2,
+                                color: Colors.white, size: 22),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
                 FilledButton(
                   onPressed: _saving ? null : _save,
                   child: const Text('Profili kaydet'),
@@ -217,7 +250,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _avatarController.dispose();
     super.dispose();
   }
 }

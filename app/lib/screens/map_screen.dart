@@ -17,6 +17,7 @@ import '../services/supabase_service.dart';
 import '../utils/hex_utils.dart';
 import '../utils/responsive.dart';
 import '../widgets/incident_sheet.dart';
+import '../widgets/tier_avatar.dart';
 import 'auth_screen.dart';
 import 'settings_screen.dart';
 
@@ -51,6 +52,7 @@ class _MapScreenState extends State<MapScreen> {
 
   List<HexScore> _hexes = [];
   List<Incident> _visibleIncidents = [];
+  Map<String, dynamic>? _profile; // avatar + uyelik kademesi (halka rengi)
   int _unread = 0;
   List<(String, LatLng)> _suggestions = [];
   int _sinceDays = 3; // varsayılan: Son 3 gün
@@ -82,7 +84,13 @@ class _MapScreenState extends State<MapScreen> {
 
   Future<void> _refreshUnread() async {
     final n = await _notifications.unreadCount();
-    if (mounted) setState(() => _unread = n);
+    final profile = await _auth.getProfile();
+    if (mounted) {
+      setState(() {
+        _unread = n;
+        _profile = profile;
+      });
+    }
   }
 
   Future<void> _startFromUserLocation() async {
@@ -785,18 +793,24 @@ class _MapScreenState extends State<MapScreen> {
               _reloadData();
             }
           }
-          if (mounted) setState(() {});
+          if (mounted) {
+            setState(() {});
+            _refreshUnread();
+          }
         },
-        child: CircleAvatar(
-          radius: 17 * ff.scale,
-          backgroundColor:
-              user == null ? Colors.grey.shade200 : const Color(0xFF1B5E20),
-          child: user == null
-              ? Icon(Icons.person_outline,
-                  color: Colors.black54, size: 18 * ff.scale)
-              : Text((user.email ?? 'U')[0].toUpperCase(),
-                  style: TextStyle(color: Colors.white, fontSize: 14 * ff.scale)),
-        ),
+        child: user == null
+            ? CircleAvatar(
+                radius: 17 * ff.scale,
+                backgroundColor: Colors.grey.shade200,
+                child: Icon(Icons.person_outline,
+                    color: Colors.black54, size: 18 * ff.scale),
+              )
+            : TierAvatar(
+                avatarValue: _profile?['avatar_url'] as String?,
+                fallbackInitial: (user.email ?? 'U')[0],
+                tier: _profile?['tier'] as String? ?? 'bronz',
+                radius: 14 * ff.scale,
+              ),
       ),
     );
   }
