@@ -70,7 +70,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: AppBar(title: const Text('Ayarlar')),
       body: user == null
           ? const Center(child: Text('Önce giriş yapmalısın.'))
-          : ListView(
+          // Web/genis ekranda tum sayfaya yayilmasin: ortalanmis kibar sutun.
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Center(
@@ -243,6 +247,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
               ],
+                ),
+              ),
             ),
     );
   }

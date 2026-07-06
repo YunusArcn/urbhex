@@ -32,9 +32,14 @@ EVENT_TYPES = [
 H3_RES_POP = 8  # nüfus eşleme çözünürlüğü (hex_population tablosu)
 
 # Token tasarrufu: metinde bu kelimelerden biri yoksa haber AI'a HİÇ gönderilmez.
-# (Asayiş sayfalarında magazin/duyuru da çıkabiliyor — onlara token harcanmaz.)
+# Küresel kapsam: Türkçe + İngilizce asayiş kelimeleri birlikte taranır.
 ASAYIS_KEYWORDS = [
+    # Türkçe
     "hırsız", "gasp", "cinayet", "öldür", "yaralan", "yaralı", "bıçak", "silah",
     "kaza", "çarptı", "uyuşturucu", "kavga", "darp", "polis", "jandarma",
     "gözaltı", "tutukla", "operasyon", "soygun", "kaçakçı", "dolandır", "cinsel",
+    # İngilizce
+    "murder", "homicide", "robbery", "shooting", "shot", "assault", "theft",
+    "burglary", "stabbing", "stabbed", "crash", "accident", "police",
+    "arrested", "drug", "killed", "injured", "gunman", "carjack",
 ]

@@ -24,9 +24,11 @@ def process_article(article) -> str:
     if parsed is None:
         return "atlandi"
 
-    # Yerel Kocaeli basını il belirtmeyebilir → varsayılan Kocaeli.
+    # Yerel Kocaeli basını il belirtmeyebilir → varsayılan Kocaeli/Türkiye.
     il = parsed.il or "Kocaeli"
-    hex_info = geo.resolve_hex(parsed.mahalle, parsed.ilce, il)
+    ulke = parsed.ulke or "Türkiye"
+    hex_info = geo.resolve_hex(parsed.mahalle, parsed.ilce, il, ulke=ulke,
+                               ulke_kodu="tr" if ulke == "Türkiye" else None)
     if hex_info is None:
         # Bölgeyle eşlenemeyen haber (trafik kazası dahil her tür): raporla, boyama.
         db.report_unmatched(article.url, article.source,

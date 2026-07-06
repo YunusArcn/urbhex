@@ -23,15 +23,23 @@ KEYWORD_QUERIES = [
 ]
 
 
-async def run(city: str, days: int) -> None:
+# İngilizce tohumlama sorguları (ülke kodu tr değilse kullanılır)
+KEYWORD_QUERIES_EN = [
+    "murder", "robbery", "shooting", "assault", "theft", "burglary",
+    "stabbing", '"car crash"', "carjacking", "arrested police",
+]
+
+
+async def run(city: str, days: int, country: str | None, cc: str) -> None:
     known = db.known_source_urls()
     seen_links: set[str] = set()
     stats: Counter = Counter()
 
-    for kw in KEYWORD_QUERIES:
+    queries = KEYWORD_QUERIES if cc == "tr" else KEYWORD_QUERIES_EN
+    for kw in queries:
         query = f'"{city}" {kw} when:{days}d'
         try:
-            items = fetch_google_news(city, query=query)
+            items = fetch_google_news(city, query=query, country_code=cc)
         except Exception as exc:
             print(f"[backfill] sorgu hatası ({kw}): {exc}")
             continue
@@ -40,7 +48,8 @@ async def run(city: str, days: int) -> None:
         print(f"[backfill] '{kw}': {len(fresh)} yeni link")
         for item in fresh:
             try:
-                result = process_item(item, city, known)
+                result = process_item(item, city, known,
+                                      country=country, country_code=cc)
                 stats[result] += 1
                 known.add(item["link"])
             except Exception as exc:
@@ -52,7 +61,9 @@ async def run(city: str, days: int) -> None:
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("city", help="İl adı, örn: Kocaeli")
+    ap.add_argument("city", help="Şehir/il adı, örn: Kocaeli, Chicago")
     ap.add_argument("--days", type=int, default=30)
+    ap.add_argument("--country", default="Türkiye", help="Ülke adı (geocoding bağlamı)")
+    ap.add_argument("--cc", default="tr", help="Ülke kodu: tr, us, gb, de...")
     args = ap.parse_args()
-    asyncio.run(run(args.city, args.days))
+    asyncio.run(run(args.city, args.days, args.country, args.cc.lower()))

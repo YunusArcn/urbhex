@@ -188,18 +188,30 @@ class _MapScreenState extends State<MapScreen>
   /// Varsayilan "Son 3 gun" bos kalirsa donemi otomatik genislet
   /// (kullanici filtreyi ELLE sectiyse dokunma).
   static const _expandChain = [3, 30, 365, 36500];
+  final Set<String> _autoScannedAreas = {}; // ayni bolge icin tek otomatik tarama
 
   void _maybeExpandPeriod() {
     if (_filterPinned || _hexes.isNotEmpty || _visibleIncidents.isNotEmpty) {
       return;
     }
     final i = _expandChain.indexOf(_sinceDays);
-    if (i < 0 || i >= _expandChain.length - 1) return;
-    final next = _expandChain[i + 1];
-    final label = _dateFilters.firstWhere((f) => f.days == next).label;
-    setState(() => _sinceDays = next);
-    _toast('Bu dönemde olay yok — "$label" gösteriliyor.');
-    _reloadData();
+    if (i >= 0 && i < _expandChain.length - 1) {
+      final next = _expandChain[i + 1];
+      final label = _dateFilters.firstWhere((f) => f.days == next).label;
+      setState(() => _sinceDays = next);
+      _toast('Bu dönemde olay yok — "$label" gösteriliyor.');
+      _reloadData();
+      return;
+    }
+    // "Tümü"de bile bos: bu bolge hic kesfedilmemis → OTOMATIK tarama baslat.
+    // Ilk gelen kullanici bos ekranla kalmaz; bot bolgeyi arka planda doldurur.
+    final c = _mapController.camera.center;
+    final areaKey = '${(c.latitude * 5).round()}_${(c.longitude * 5).round()}';
+    if (!_scanning && !_autoScannedAreas.contains(areaKey)) {
+      _autoScannedAreas.add(areaKey);
+      Analytics.capture('auto_scan_triggered');
+      _scanVisibleArea(auto: true);
+    }
   }
 
   void _onMapMoved(MapEvent event) {
@@ -306,12 +318,13 @@ class _MapScreenState extends State<MapScreen>
 
   // ---------------- BOLGE TARAMA (kuyruk + canli bekleme) ----------------
 
-  /// Butona basinca: istek kuyruklanir, bot isleyene kadar durum izlenir,
-  /// bitince harita kendiliginden yenilenir.
-  Future<void> _scanVisibleArea() async {
+  /// Istek kuyruklanir, bot isleyene kadar durum izlenir, bitince harita
+  /// kendiliginden yenilenir. auto=true: bos bolgede sistem kendisi tetikledi.
+  Future<void> _scanVisibleArea({bool auto = false}) async {
     setState(() => _scanning = true);
     final b = _mapController.camera.visibleBounds;
     Analytics.capture('scan_click', {
+      'auto': auto,
       'lat': _mapController.camera.center.latitude,
       'lng': _mapController.camera.center.longitude,
     });
@@ -319,7 +332,10 @@ class _MapScreenState extends State<MapScreen>
       final id = await _service.requestScan(
         minLat: b.south, minLng: b.west, maxLat: b.north, maxLng: b.east,
       );
-      _toast('Bölge tarama kuyruğuna alındı — bot çalışınca sonuçlar düşecek.');
+      _toast(auto
+          ? 'Bu bölge ilk kez keşfediliyor 🌍 — haberler aranıyor, harita '
+              'birazdan kendini dolduracak.'
+          : 'Bölge tarama kuyruğuna alındı — bot çalışınca sonuçlar düşecek.');
 
       // 2 dakika boyunca 4 sn'de bir durum kontrolu (bot lokal/bulutta calisiyorsa).
       for (var i = 0; i < 30; i++) {

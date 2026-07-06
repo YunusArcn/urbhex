@@ -54,14 +54,13 @@ def _save_cache(cache: dict) -> None:
     _CACHE_FILE.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
-def _nominatim(query: str) -> tuple[float, float] | None:
-    """OSM Nominatim sorgusu (Türkiye ile sınırlı)."""
-    params = urllib.parse.urlencode({
-        "q": query,
-        "format": "json",
-        "limit": 1,
-        "countrycodes": "tr",
-    })
+def _nominatim(query: str, country_code: str | None = None) -> tuple[float, float] | None:
+    """OSM Nominatim sorgusu. country_code verilirse o ülkeyle sınırlanır
+    (yanlış ülke eşleşmesini önler); verilmezse DÜNYA GENELİ arar."""
+    p = {"q": query, "format": "json", "limit": 1}
+    if country_code:
+        p["countrycodes"] = country_code
+    params = urllib.parse.urlencode(p)
     req = urllib.request.Request(
         f"https://nominatim.openstreetmap.org/search?{params}",
         headers={"User-Agent": "UrbhexBot/0.1 (+https://urbhex.com)"},
@@ -75,11 +74,16 @@ def _nominatim(query: str) -> tuple[float, float] | None:
 
 
 def _coords_for(
-    mahalle: str | None, ilce: str | None, il: str | None
+    mahalle: str | None,
+    ilce: str | None,
+    il: str | None,
+    ulke: str | None,
+    ulke_kodu: str | None,
 ) -> tuple[tuple[float, float], str] | None:
     """Koordinat + hangi hassasiyette çözüldüğü: 'mahalle' | 'ilce' | 'il'."""
     il = (il or "").strip()
     ilce = (ilce or "").strip()
+    ulke = (ulke or "").strip()
 
     # Hızlı yol: Kocaeli/İzmit sözlüğü (il belirtilmemişse de dener — eski davranış).
     if mahalle and (not il or "kocaeli" in _normalize(il)):
@@ -87,14 +91,15 @@ def _coords_for(
         if key in IZMIT_MAHALLE_MERKEZLERI:
             return IZMIT_MAHALLE_MERKEZLERI[key], "mahalle"
 
-    # Kademeli sorgular: en hassastan en kabaya (hassasiyet etiketiyle).
+    # Kademeli sorgular: en hassastan en kabaya. Ülke adı sorguya eklenir,
+    # ülke kodu Nominatim'i sınırlar → New York'taki "Springfield" karışmaz.
     queries: list[tuple[str, str]] = []
     if mahalle and (ilce or il):
-        queries.append((", ".join(p for p in (mahalle, ilce, il) if p), "mahalle"))
+        queries.append((", ".join(p for p in (mahalle, ilce, il, ulke) if p), "mahalle"))
     if ilce:
-        queries.append((", ".join(p for p in (ilce, il) if p) or ilce, "ilce"))
+        queries.append((", ".join(p for p in (ilce, il, ulke) if p) or ilce, "ilce"))
     if il:
-        queries.append((il, "il"))
+        queries.append((", ".join(p for p in (il, ulke) if p), "il"))
     if not queries and mahalle:
         queries.append((mahalle, "mahalle"))
     if not queries:
@@ -107,7 +112,7 @@ def _coords_for(
                 return tuple(cache[query]), precision
             continue  # daha önce bulunamamış sorgu — bir alt hassasiyete geç
         try:
-            coords = _nominatim(query)
+            coords = _nominatim(query, ulke_kodu)
         except Exception:
             return None  # ağ hatasında cache'e yazma, sonraki turda yeniden dene
         cache[query] = list(coords) if coords else None
@@ -118,14 +123,18 @@ def _coords_for(
 
 
 def resolve_hex(
-    mahalle: str | None, ilce: str | None = None, il: str | None = None
+    mahalle: str | None,
+    ilce: str | None = None,
+    il: str | None = None,
+    ulke: str | None = None,
+    ulke_kodu: str | None = None,
 ) -> dict | None:
     """Mahalle/ilçe/il adını hex bilgisine çevirir; çözülemezse None (raporlanır).
 
     Dönen 'precision' alanı harita katmanını belirler: 'il' hassasiyetindeki
     olaylar sokak hex'i boyamaz (il merkezinde sahte yığın engellenir).
     """
-    result = _coords_for(mahalle, ilce, il)
+    result = _coords_for(mahalle, ilce, il, ulke, ulke_kodu)
     if result is None:
         return None
     (lat, lng), precision = result

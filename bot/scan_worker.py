@@ -29,9 +29,27 @@ from config import ASAYIS_KEYWORDS
 from parser import is_same_incident, parse_article
 
 MAX_REQUESTS_PER_RUN = 5
-MAX_ITEMS_PER_CITY = 25  # token guvenligi: sehir basina en fazla 25 haber AI'a gider
+MAX_ITEMS_PER_CITY = 15  # hiz: ilk turda 15 haber (kalanlar sonraki turlarda gelir)
 
 _UA = {"User-Agent": "UrbhexBot/0.1 (+https://urbhex.com)"}
+
+# Ülke kodu → Google News yereli (hl, gl, ceid) ve sorgu dili.
+_LOCALES = {
+    "tr": ("tr", "TR", "TR:tr"),
+    "us": ("en-US", "US", "US:en"),
+    "gb": ("en-GB", "GB", "GB:en"),
+    "de": ("de", "DE", "DE:de"),
+    "fr": ("fr", "FR", "FR:fr"),
+    "es": ("es", "ES", "ES:es"),
+    "it": ("it", "IT", "IT:it"),
+    "nl": ("nl", "NL", "NL:nl"),
+}
+_DEFAULT_LOCALE = ("en-US", "US", "US:en")  # bilinmeyen ülke → İngilizce
+
+_CRIME_QUERY_TR = ('(cinayet OR gasp OR hırsızlık OR kavga OR yaralandı '
+                   'OR "trafik kazası" OR uyuşturucu OR "silahlı saldırı")')
+_CRIME_QUERY_EN = ('(murder OR robbery OR shooting OR assault OR theft '
+                   'OR burglary OR stabbing OR "car crash")')
 
 
 def _http_get(url: str) -> bytes:
@@ -40,28 +58,36 @@ def _http_get(url: str) -> bytes:
         return resp.read()
 
 
-def detect_city(lat: float, lng: float) -> str | None:
-    """Bbox merkezindeki ili bulur (zoom=8 ≈ il seviyesi)."""
+def detect_city(lat: float, lng: float) -> tuple[str | None, str | None, str | None]:
+    """Bbox merkezindeki (şehir/eyalet, ülke adı, ülke kodu) — DÜNYA GENELİ."""
     params = urllib.parse.urlencode(
-        {"lat": lat, "lon": lng, "zoom": 8, "format": "json"})
+        {"lat": lat, "lon": lng, "zoom": 8, "format": "json",
+         "accept-language": "en"})
     data = json.loads(_http_get(
         f"https://nominatim.openstreetmap.org/reverse?{params}"))
     addr = data.get("address", {})
-    return addr.get("province") or addr.get("state") or addr.get("city")
+    city = (addr.get("province") or addr.get("state") or addr.get("city")
+            or addr.get("county"))
+    return city, addr.get("country"), addr.get("country_code")
 
 
-def fetch_google_news(city: str, query: str | None = None, days: int = 7) -> list[dict]:
-    """Google News RSS: ilin asayiş haberleri (başlık, link, tarih, özet).
+def fetch_google_news(
+    city: str,
+    query: str | None = None,
+    days: int = 7,
+    country_code: str | None = "tr",
+) -> list[dict]:
+    """Google News RSS: şehrin asayiş haberleri — ÜLKEYE GÖRE dil ve yerel.
 
-    query verilmezse genel asayiş sorgusu kurulur; backfill_city.py anahtar
-    kelime bazlı özel sorgular geçirir (RSS'in ~100 sonuç tavanını aşmak için).
+    query verilmezse ülke diline uygun asayiş sorgusu kurulur; backfill_city.py
+    özel sorgular geçirir (RSS'in ~100 sonuç tavanını aşmak için).
     """
-    query = query or (
-        f'"{city}" (cinayet OR gasp OR hırsızlık OR kavga OR yaralandı '
-        f'OR "trafik kazası" OR uyuşturucu OR "silahlı saldırı") when:{days}d'
-    )
+    hl, gl, ceid = _LOCALES.get((country_code or "").lower(), _DEFAULT_LOCALE)
+    if query is None:
+        crime = _CRIME_QUERY_TR if (country_code or "").lower() == "tr" else _CRIME_QUERY_EN
+        query = f'"{city}" {crime} when:{days}d'
     url = ("https://news.google.com/rss/search?q="
-           f"{urllib.parse.quote(query)}&hl=tr&gl=TR&ceid=TR:tr")
+           f"{urllib.parse.quote(query)}&hl={hl}&gl={gl}&ceid={ceid}")
     root = ET.fromstring(_http_get(url))
     items = []
     for item in root.iter("item"):
@@ -96,7 +122,13 @@ def _fetch_article_body(link: str) -> str | None:
         return None
 
 
-def process_item(item: dict, city: str, known: set[str]) -> str:
+def process_item(
+    item: dict,
+    city: str,
+    known: set[str],
+    country: str | None = None,
+    country_code: str | None = None,
+) -> str:
     if item["link"] in known:
         return "atlandi"
     # Önce ucuz ön filtre başlık+özet üzerinden; geçerse tam metni çek.
@@ -111,10 +143,11 @@ def process_item(item: dict, city: str, known: set[str]) -> str:
         return "atlandi"
 
     il = parsed.il or city  # haber il vermezse tespit edilen şehir kullanılır
-    hex_info = geo.resolve_hex(parsed.mahalle, parsed.ilce, il)
+    hex_info = geo.resolve_hex(parsed.mahalle, parsed.ilce, il,
+                               ulke=country, ulke_kodu=country_code)
     if hex_info is None:
         db.report_unmatched(item["link"], "google_news",
-                            f"konum_cozulemedi:{parsed.mahalle or '-'}/{parsed.ilce or '-'}/{il}")
+                            f"konum_cozulemedi:{parsed.mahalle or '-'}/{parsed.ilce or '-'}/{il}/{country or '-'}")
         return "konumsuz"
 
     occurred = parsed.tarih.isoformat()
@@ -148,18 +181,19 @@ async def run() -> None:
     for req in pending:
         client.table("scan_requests").update({"status": "processing"}).eq("id", req["id"]).execute()
         try:
-            city = detect_city(
+            city, country, cc = detect_city(
                 (req["min_lat"] + req["max_lat"]) / 2,
                 (req["min_lng"] + req["max_lng"]) / 2,
             )
             if not city:
                 raise ValueError("şehir tespit edilemedi")
-            print(f"[scan_worker] Bölge: {city} — Google News taranıyor...")
+            print(f"[scan_worker] Bölge: {city}, {country} ({cc}) — Google News taranıyor...")
 
             stats = {"eklendi": 0, "birlestirildi": 0, "atlandi": 0, "konumsuz": 0}
-            for item in fetch_google_news(city)[:MAX_ITEMS_PER_CITY]:
+            for item in fetch_google_news(city, country_code=cc)[:MAX_ITEMS_PER_CITY]:
                 try:
-                    result = process_item(item, city, known)
+                    result = process_item(item, city, known,
+                                          country=country, country_code=cc)
                     stats[result] += 1
                     known.add(item["link"])
                 except Exception as exc:

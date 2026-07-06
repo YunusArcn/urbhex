@@ -15,22 +15,29 @@ client = anthropic.Anthropic()  # ANTHROPIC_API_KEY ortam değişkeninden okunur
 # NOT: claude-3-5-haiku-20241022 Şubat 2026'da emekli edildi, o ID artık 404 döner.
 MODEL = "claude-haiku-4-5"
 
-SYSTEM_PROMPT = f"""Sen bir asayiş haberi ayrıştırma asistanısın. Sana verilen Türkçe haber metninden \
-yapılandırılmış veri çıkarırsın. Türkiye'nin HERHANGİ bir ilindeki olaylar geçerlidir.
+SYSTEM_PROMPT = f"""Sen KÜRESEL bir asayiş haberi ayrıştırma asistanısın. Haber Türkçe, İngilizce \
+veya başka bir dilde olabilir; DÜNYANIN HERHANGİ BİR YERİNDEKİ olaylar geçerlidir.
 
-KURALLAR (KVKK — ihlal edilemez):
-- Özette ASLA şahıs ismi, isim kısaltması (Ahmet Y., M.K. vb.), plaka, kapı/apartman numarası yazma.
-- Özet en fazla 2 cümle, tarafsız ve anonim olsun. Kişiler "bir kişi", "iki şüpheli" gibi anılır.
-- olay_turu şunlardan biri olmalı: {", ".join(EVENT_TYPES)}. Emin değilsen "diger" seç.
+KURALLAR (gizlilik — ihlal edilemez):
+- Özette ASLA şahıs ismi/kısaltması, plaka, kapı/apartman numarası yazma.
+- Özet en fazla 2 cümle, TÜRKÇE, tarafsız ve anonim olsun ("bir kişi", "iki şüpheli").
+- olay_turu şunlardan biri olmalı: {", ".join(EVENT_TYPES)}.
+  İngilizce eşleme: murder/homicide→cinayet, shooting→silahli_saldiri,
+  robbery→gasp, theft/burglary→hirsizlik, assault/stabbing→yaralama,
+  brawl/fight→kavga, drug→uyusturucu, car crash/accident→trafik_kazasi.
+  Emin değilsen "diger".
 - Haber bir asayiş/kaza olayı anlatmıyorsa (magazin, spor, duyuru, siyaset) ilgili=false döndür.
-- il / ilce / mahalle: metinde geçenleri aynen yaz; geçmeyeni null bırak.
+- Konum alanları: ulke = ülke adı; il = şehir/eyalet (örn: Bursa, New York);
+  ilce = ilçe/district/borough/county; mahalle = mahalle/neighborhood.
+  Metinde geçenleri aynen yaz; geçmeyeni null bırak.
 - Tarih metinden çıkarılamıyorsa yayın bağlamından tahmin et, o da yoksa null bırak."""
 
 
 class ParsedIncident(BaseModel):
     ilgili: bool            # bir asayiş/kaza olayı mı?
-    il: str | None          # örn: Bursa
-    ilce: str | None        # örn: Osmangazi
+    ulke: str | None        # örn: Türkiye, United States
+    il: str | None          # örn: Bursa, New York
+    ilce: str | None        # örn: Osmangazi, Brooklyn
     mahalle: str | None
     olay_turu: str | None
     tarih: date | None      # YYYY-MM-DD
