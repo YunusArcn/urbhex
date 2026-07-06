@@ -68,6 +68,12 @@ class _MapScreenState extends State<MapScreen>
   bool _introRunning = true; // sinematik yaklasma bitene kadar veri cekme
   late final AnimationController _introCtrl = AnimationController(
       vsync: this, duration: const Duration(milliseconds: 2800));
+
+  // Misafir turu: kayitsiz kullanici baslangic noktasinin 40 km cevresinde
+  // gezer; disari cikinca samimi bir kayit daveti cikar (uyelikte sinir yok).
+  static const _guestLimitKm = 40.0;
+  LatLng? _guestAnchor;
+  bool _limitDialogOpen = false;
   bool _scanning = false;
   double _zoom = 13;
   Timer? _debounce;
@@ -130,6 +136,7 @@ class _MapScreenState extends State<MapScreen>
     anim.removeListener(tick);
     _introRunning = false;
     _zoom = endZoom;
+    _guestAnchor = target; // misafir turu bu noktaya demirler
     _reloadData();
   }
 
@@ -198,8 +205,101 @@ class _MapScreenState extends State<MapScreen>
   void _onMapMoved(MapEvent event) {
     if (_introRunning) return; // yaklasma sirasinda veri cekme/spam yok
     _zoom = _mapController.camera.zoom;
+    if (_checkGuestLimit()) return; // sinir asildi: geri cek + davet goster
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), _reloadData);
+  }
+
+  /// Misafir sinir kontrolu. Asildiysa true doner (veri cekme iptal edilir).
+  bool _checkGuestLimit() {
+    if (_auth.isLoggedIn || _guestAnchor == null || _limitDialogOpen) {
+      return false;
+    }
+    final center = _mapController.camera.center;
+    const d = Distance();
+    final km = d.as(LengthUnit.Kilometer, _guestAnchor!, center);
+    final tooFar = km > _guestLimitKm;
+    final tooHigh = _zoom < 7.5; // cok uzaklasip tum ulkeyi gormek de sinirda
+    if (!tooFar && !tooHigh) return false;
+
+    // Nazikce sinira geri cek: demir noktasi yonunde %85 mesafeye.
+    final t = tooFar ? (_guestLimitKm * 0.85) / km : 0.0;
+    final pullback = LatLng(
+      _guestAnchor!.latitude +
+          (center.latitude - _guestAnchor!.latitude) * t,
+      _guestAnchor!.longitude +
+          (center.longitude - _guestAnchor!.longitude) * t,
+    );
+    _mapController.move(pullback, _zoom < 10 ? 11.5 : _zoom);
+    Analytics.capture('guest_limit_hit', {'km': km.round()});
+    _showGuestInvite(km.round());
+    return true;
+  }
+
+  /// Ziplayarak acilan samimi kayit daveti.
+  Future<void> _showGuestInvite(int km) async {
+    _limitDialogOpen = true;
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'davet',
+      barrierColor: Colors.black38,
+      transitionDuration: const Duration(milliseconds: 450),
+      transitionBuilder: (context, anim, _, child) => ScaleTransition(
+        scale: CurvedAnimation(parent: anim, curve: Curves.elasticOut),
+        child: FadeTransition(opacity: anim, child: child),
+      ),
+      pageBuilder: (context, _, __) => Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Card(
+            margin: const EdgeInsets.all(24),
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20)),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                const Text('🧭', style: TextStyle(fontSize: 44)),
+                const SizedBox(height: 8),
+                const Text('Kâşif ruhunu sevdik!',
+                    style: TextStyle(
+                        fontSize: 19, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 10),
+                Text(
+                  'Görünüşe göre Urbhex\'i beğendin — daha şimdiden '
+                  '${km > _guestLimitKm.round() ? "$km km öteye uçtun" : "kuş bakışı tura çıktın"}! '
+                  'Misafir turu ${_guestLimitKm.round()} km\'ye kadar. '
+                  'Ücretsiz kayıt ol; tüm Türkiye\'yi (hatta dünyayı) gez, '
+                  'bölgeni favorile, Güvenlik Alarmı kur. Söz, 30 saniye sürüyor.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13.5, color: Colors.grey.shade700),
+                ),
+                const SizedBox(height: 18),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(44)),
+                  icon: const Icon(Icons.rocket_launch),
+                  label: const Text('Ücretsiz Kayıt Ol'),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const AuthScreen()));
+                  },
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Şimdilik buralardayım 🏡'),
+                ),
+              ]),
+            ),
+          ),
+        ),
+      ),
+    );
+    _limitDialogOpen = false;
+    if (mounted) setState(() {});
   }
 
   bool get _detailed => _zoom >= _detailZoom;
