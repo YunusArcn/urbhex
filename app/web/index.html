@@ -38,6 +38,24 @@
     }
   </script>
 
+  <!-- ============ Google Analytics 4 (istege bagli) ============
+       Kurulum: analytics.google.com -> hesap/mulk olustur -> Web veri akisi:
+       urbhex.com -> "Olcum Kimligi"ni (G-XXXXXXXXXX) kopyala ve asagidaki
+       __GA4_ID__ yerine yapistir. Girilmezse GA sessizce devre disi kalir. -->
+  <script>
+    var GA_ID = "__GA4_ID__";
+    if (GA_ID.indexOf("G-") === 0) {
+      var gs = document.createElement("script");
+      gs.async = true;
+      gs.src = "https://www.googletagmanager.com/gtag/js?id=" + GA_ID;
+      document.head.appendChild(gs);
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      gtag("js", new Date());
+      gtag("config", GA_ID);
+    }
+  </script>
+
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">

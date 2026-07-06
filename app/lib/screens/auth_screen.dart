@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../services/analytics/analytics.dart';
 import '../services/auth_service.dart';
 
-/// Giris / kayit ekrani: Google OAuth + e-posta (dogrulama mailli).
+/// Giris / kayit ekrani — iki mod ayri kurgulanmistir:
+///  Giris : e-posta + sifre
+///  Kayit : ad soyad + e-posta + sifre + sifre tekrar (dogrulama mailli)
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
@@ -13,24 +15,39 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   final _auth = AuthService();
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _password2 = TextEditingController();
+
   bool _registerMode = false;
   bool _busy = false;
-  String? _message;
+  bool _obscure = true;
+  String? _error;
+  String? _info;
 
   Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
     setState(() {
       _busy = true;
-      _message = null;
+      _error = null;
+      _info = null;
     });
     try {
       if (_registerMode) {
-        await _auth.signUp(_email.text.trim(), _password.text);
+        await _auth.signUp(
+          _email.text.trim(),
+          _password.text,
+          displayName: _name.text.trim(),
+        );
         Analytics.capture('sign_up');
-        setState(() => _message =
-            'Doğrulama e-postası gönderildi. Gelen kutunu kontrol edip '
-            'linke tıkladıktan sonra giriş yapabilirsin.');
+        setState(() {
+          _info = 'Hesabın oluşturuldu! ${_email.text.trim()} adresine '
+              'doğrulama linki gönderdik. Linke tıkladıktan sonra buradan '
+              'giriş yapabilirsin.';
+          _registerMode = false;
+        });
       } else {
         await _auth.signIn(_email.text.trim(), _password.text);
         final user = _auth.currentUser;
@@ -39,87 +56,230 @@ class _AuthScreenState extends State<AuthScreen> {
         if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
-      // Gercek nedeni goster (ornek: "Email not confirmed", "Invalid login credentials").
-      final raw = e.toString();
-      final detail = raw.length > 140 ? raw.substring(0, 140) : raw;
-      setState(() => _message = 'Giriş başarısız: $detail\n'
-          'İpucu: kayıt olduysan önce e-postandaki doğrulama linkine tıkla.');
+      setState(() => _error = _humanize(e.toString()));
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
+  /// Supabase hata metinlerini kullanicinin anlayacagi dile cevirir.
+  String _humanize(String raw) {
+    if (raw.contains('Invalid login credentials')) {
+      return 'E-posta veya şifre hatalı.';
+    }
+    if (raw.contains('Email not confirmed')) {
+      return 'E-postan henüz doğrulanmamış — gelen kutundaki linke tıkla '
+          '(spam klasörünü de kontrol et).';
+    }
+    if (raw.contains('already registered')) {
+      return 'Bu e-posta zaten kayıtlı — giriş yapmayı dene.';
+    }
+    if (raw.contains('rate limit') || raw.contains('Too many')) {
+      return 'Çok fazla deneme yapıldı — birkaç dakika bekleyip tekrar dene.';
+    }
+    return 'İşlem başarısız: ${raw.length > 120 ? raw.substring(0, 120) : raw}';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(_registerMode ? 'Kayıt Ol' : 'Giriş Yap')),
+      appBar: AppBar(),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 400),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(Icons.hexagon, size: 56, color: Color(0xFF1B5E20)),
-                const SizedBox(height: 8),
-                const Text('urbhex', textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w300)),
-                const SizedBox(height: 24),
-                FilledButton.icon(
-                  onPressed: _busy ? null : () => _auth.signInWithGoogle(),
-                  icon: const Icon(Icons.g_mobiledata, size: 28),
-                  label: const Text('Google ile devam et'),
-                ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Row(children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      child: Text('veya e-posta ile'),
-                    ),
-                    Expanded(child: Divider()),
-                  ]),
-                ),
-                TextField(
-                  controller: _email,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                      labelText: 'E-posta', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _password,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                      labelText: 'Şifre (en az 6 karakter)',
-                      border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 16),
-                FilledButton(
-                  onPressed: _busy ? null : _submit,
-                  child: _busy
-                      ? const SizedBox(
-                          height: 18, width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text(_registerMode ? 'Kayıt ol' : 'Giriş yap'),
-                ),
-                TextButton(
-                  onPressed: () => setState(() => _registerMode = !_registerMode),
-                  child: Text(_registerMode
-                      ? 'Zaten hesabın var mı? Giriş yap'
-                      : 'Hesabın yok mu? Kayıt ol'),
-                ),
-                if (_message != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(_message!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.orange.shade800)),
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Icon(Icons.hexagon, size: 52, color: Color(0xFF1B5E20)),
+                  const SizedBox(height: 6),
+                  Text.rich(
+                    const TextSpan(children: [
+                      TextSpan(text: 'urb', style: TextStyle(fontWeight: FontWeight.w300)),
+                      TextSpan(
+                          text: 'hex',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w800, color: Color(0xFF1B5E20))),
+                    ]),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.headlineMedium,
                   ),
-              ],
+                  Text(
+                    _registerMode
+                        ? 'Ücretsiz hesap oluştur; bölgeni favorile, gelişmeleri kaçırma.'
+                        : 'Tekrar hoş geldin!',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium
+                        ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Mod secici: Giris / Kayit gorsel olarak net ayrilir.
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(
+                          value: false,
+                          label: Text('Giriş Yap'),
+                          icon: Icon(Icons.login)),
+                      ButtonSegment(
+                          value: true,
+                          label: Text('Kayıt Ol'),
+                          icon: Icon(Icons.person_add_alt)),
+                    ],
+                    selected: {_registerMode},
+                    onSelectionChanged: (s) => setState(() {
+                      _registerMode = s.first;
+                      _error = null;
+                      _info = null;
+                    }),
+                  ),
+                  const SizedBox(height: 20),
+
+                  if (_registerMode) ...[
+                    TextFormField(
+                      controller: _name,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                        labelText: 'Ad Soyad',
+                        prefixIcon: Icon(Icons.badge_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().length < 3) ? 'Adını yaz' : null,
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  TextFormField(
+                    controller: _email,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'E-posta',
+                      prefixIcon: Icon(Icons.mail_outline),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) => (v == null || !v.contains('@'))
+                        ? 'Geçerli bir e-posta gir'
+                        : null,
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _password,
+                    obscureText: _obscure,
+                    decoration: InputDecoration(
+                      labelText: 'Şifre',
+                      helperText: _registerMode ? 'En az 6 karakter' : null,
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                            _obscure ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                      ),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.length < 6) ? 'En az 6 karakter' : null,
+                  ),
+                  if (_registerMode) ...[
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _password2,
+                      obscureText: _obscure,
+                      decoration: const InputDecoration(
+                        labelText: 'Şifre (tekrar)',
+                        prefixIcon: Icon(Icons.lock_reset),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (v) =>
+                          v != _password.text ? 'Şifreler aynı değil' : null,
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+
+                  FilledButton(
+                    onPressed: _busy ? null : _submit,
+                    style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14)),
+                    child: _busy
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : Text(
+                            _registerMode
+                                ? 'Hesap Oluştur'
+                                : 'Giriş Yap',
+                            style: const TextStyle(fontSize: 15)),
+                  ),
+
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 14),
+                    child: Row(children: [
+                      Expanded(child: Divider()),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10),
+                        child: Text('veya', style: TextStyle(fontSize: 12)),
+                      ),
+                      Expanded(child: Divider()),
+                    ]),
+                  ),
+
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : () => _auth.signInWithGoogle(),
+                    style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13)),
+                    icon: const Icon(Icons.g_mobiledata, size: 26),
+                    label: Text(_registerMode
+                        ? 'Google ile kayıt ol'
+                        : 'Google ile giriş yap'),
+                  ),
+
+                  if (_error != null)
+                    Container(
+                      margin: const EdgeInsets.only(top: 14),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.errorContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.error_outline,
+                            color: theme.colorScheme.onErrorContainer, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_error!,
+                              style: TextStyle(
+                                  color: theme.colorScheme.onErrorContainer,
+                                  fontSize: 13)),
+                        ),
+                      ]),
+                    ),
+                  if (_info != null)
+                    Container(
+                      margin: const EdgeInsets.only(top: 14),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.mark_email_read_outlined,
+                            color: Colors.green.shade800, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(_info!,
+                              style: TextStyle(
+                                  color: Colors.green.shade900, fontSize: 13)),
+                        ),
+                      ]),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -129,8 +289,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   void dispose() {
+    _name.dispose();
     _email.dispose();
     _password.dispose();
+    _password2.dispose();
     super.dispose();
   }
 }

@@ -21,8 +21,16 @@ class AuthService {
 
   /// Kayit: Supabase dogrulama e-postasi gonderir; kullanici onaylayana
   /// kadar oturum acilmaz (Dashboard'da "Confirm email" acik olmali).
-  Future<void> signUp(String email, String password) => _client.auth
-      .signUp(email: email, password: password, emailRedirectTo: _redirect);
+  /// displayName, profiles tablosuna trigger uzerinden otomatik yazilir.
+  Future<void> signUp(String email, String password, {String? displayName}) =>
+      _client.auth.signUp(
+        email: email,
+        password: password,
+        emailRedirectTo: _redirect,
+        data: displayName != null && displayName.isNotEmpty
+            ? {'full_name': displayName}
+            : null,
+      );
 
   Future<void> signIn(String email, String password) =>
       _client.auth.signInWithPassword(email: email, password: password);

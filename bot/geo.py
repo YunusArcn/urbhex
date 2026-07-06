@@ -76,7 +76,8 @@ def _nominatim(query: str) -> tuple[float, float] | None:
 
 def _coords_for(
     mahalle: str | None, ilce: str | None, il: str | None
-) -> tuple[float, float] | None:
+) -> tuple[tuple[float, float], str] | None:
+    """Koordinat + hangi hassasiyette çözüldüğü: 'mahalle' | 'ilce' | 'il'."""
     il = (il or "").strip()
     ilce = (ilce or "").strip()
 
@@ -84,26 +85,26 @@ def _coords_for(
     if mahalle and (not il or "kocaeli" in _normalize(il)):
         key = _normalize(mahalle)
         if key in IZMIT_MAHALLE_MERKEZLERI:
-            return IZMIT_MAHALLE_MERKEZLERI[key]
+            return IZMIT_MAHALLE_MERKEZLERI[key], "mahalle"
 
-    # Kademeli sorgular: en hassastan en kabaya.
-    queries = []
+    # Kademeli sorgular: en hassastan en kabaya (hassasiyet etiketiyle).
+    queries: list[tuple[str, str]] = []
     if mahalle and (ilce or il):
-        queries.append(", ".join(p for p in (mahalle, ilce, il) if p))
+        queries.append((", ".join(p for p in (mahalle, ilce, il) if p), "mahalle"))
     if ilce:
-        queries.append(", ".join(p for p in (ilce, il) if p) or ilce)
+        queries.append((", ".join(p for p in (ilce, il) if p) or ilce, "ilce"))
     if il:
-        queries.append(il)
+        queries.append((il, "il"))
     if not queries and mahalle:
-        queries.append(mahalle)  # elde sadece mahalle varsa yine de dene
+        queries.append((mahalle, "mahalle"))
     if not queries:
         return None
 
     cache = _load_cache()
-    for query in queries:
+    for query, precision in queries:
         if query in cache:
             if cache[query]:
-                return tuple(cache[query])
+                return tuple(cache[query]), precision
             continue  # daha önce bulunamamış sorgu — bir alt hassasiyete geç
         try:
             coords = _nominatim(query)
@@ -112,18 +113,22 @@ def _coords_for(
         cache[query] = list(coords) if coords else None
         _save_cache(cache)
         if coords:
-            return coords
+            return coords, precision
     return None
 
 
 def resolve_hex(
     mahalle: str | None, ilce: str | None = None, il: str | None = None
 ) -> dict | None:
-    """Mahalle/ilçe/il adını hex bilgisine çevirir; çözülemezse None (raporlanır)."""
-    coords = _coords_for(mahalle, ilce, il)
-    if coords is None:
+    """Mahalle/ilçe/il adını hex bilgisine çevirir; çözülemezse None (raporlanır).
+
+    Dönen 'precision' alanı harita katmanını belirler: 'il' hassasiyetindeki
+    olaylar sokak hex'i boyamaz (il merkezinde sahte yığın engellenir).
+    """
+    result = _coords_for(mahalle, ilce, il)
+    if result is None:
         return None
-    lat, lng = coords
+    (lat, lng), precision = result
     h3_res9 = h3.latlng_to_cell(lat, lng, H3_RES_FINE)
     center_lat, center_lng = h3.cell_to_latlng(h3_res9)
     return {
@@ -132,4 +137,5 @@ def resolve_hex(
         "h3_res7": h3.latlng_to_cell(lat, lng, H3_RES_COARSE),
         "lat": center_lat,   # hex MERKEZİ yazılır — olay adresi değil (KVKK)
         "lng": center_lng,
+        "precision": precision,
     }

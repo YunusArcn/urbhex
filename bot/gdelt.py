@@ -84,6 +84,7 @@ def _parse_events(zip_bytes: bytes) -> list[dict]:
             "h3_res9": h3_res9,
             "h3_res8": h3.cell_to_parent(h3_res9, H3_RES_POP),  # nüfus eşlemesi (şema v2)
             "h3_res7": h3.latlng_to_cell(lat, lng, H3_RES_COARSE),
+            "precision": "ilce",  # GDELT şehir noktası ~ ilçe hassasiyeti
             "lat": center_lat,   # hex merkezi (KVKK: nokta adres yazılmaz)
             "lng": center_lng,
             "source_urls": [row[COL_SOURCE_URL]],

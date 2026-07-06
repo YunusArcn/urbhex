@@ -73,12 +73,31 @@ def fetch_google_news(city: str) -> list[dict]:
     return items
 
 
+def _fetch_article_body(link: str) -> str | None:
+    """Google News linkini takip edip haberin GERÇEK sayfasından tam metni çeker.
+
+    Mahalle/sokak adı genelde RSS özetinde değil tam metinde geçer —
+    hex'in il merkezine değil olayın mahallesine oturması bunu gerektirir.
+    """
+    try:
+        from scraper import _extract_body  # gövde ayıklama mantığı tek yerde
+
+        html = _http_get(link).decode("utf-8", errors="replace")
+        body = _extract_body(html)
+        return body if len(body) > 250 else None
+    except Exception:
+        return None
+
+
 def process_item(item: dict, city: str, known: set[str]) -> str:
     if item["link"] in known:
         return "atlandi"
-    text = f"{item['title']}\n\n{item['desc']}\n\nYayın tarihi: {item['date']}"
-    if not any(k in text.lower() for k in ASAYIS_KEYWORDS):
+    # Önce ucuz ön filtre başlık+özet üzerinden; geçerse tam metni çek.
+    header = f"{item['title']}\n\n{item['desc']}"
+    if not any(k in header.lower() for k in ASAYIS_KEYWORDS):
         return "atlandi"
+    body = _fetch_article_body(item["link"])
+    text = f"{item['title']}\n\n{body or item['desc']}\n\nYayın tarihi: {item['date']}"
 
     parsed = parse_article(text)
     if parsed is None:
