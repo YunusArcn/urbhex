@@ -15,7 +15,7 @@ app/build/
 app/.flutter-plugins*
 app/.packages
 app/pubspec.lock
-app/web/
+# app/web takip edilir: index.html analitik yapilandirmasi iceriyor
 app/android/
 app/ios/
 app/windows/

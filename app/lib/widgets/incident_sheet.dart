@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models/hex_score.dart';
 import '../models/incident.dart';
 import '../screens/auth_screen.dart';
+import '../services/analytics/analytics.dart';
 import '../services/favorites_service.dart';
 import '../services/supabase_service.dart';
 import '../utils/responsive.dart';
@@ -55,6 +56,7 @@ class _IncidentSheetState extends State<IncidentSheet> {
   Future<void> _toggleFavorite() async {
     try {
       final nowFav = await _favorites.toggle(widget.hex);
+      Analytics.capture(nowFav ? 'favorite_add' : 'favorite_remove');
       if (mounted) setState(() => _isFav = nowFav);
     } on StateError {
       // Uye degil → giris ekranina yonlendir, donunce tekrar dene.
@@ -196,6 +198,11 @@ class _IncidentCard extends StatelessWidget {
   }
 
   void _openSources(BuildContext context) {
+    // Gelir kaniti: "Kocaeli'de su kadar haber kaynaga yonlendirildi" verisi.
+    Analytics.capture('news_source_click', {
+      'event_type': incident.eventType,
+      'district': incident.district,
+    });
     if (incident.sourceUrls.length == 1) {
       launchUrl(Uri.parse(incident.sourceUrls.first),
           mode: LaunchMode.externalApplication);

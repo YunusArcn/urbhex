@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/analytics/analytics.dart';
 import '../services/auth_service.dart';
 
 /// Giris / kayit ekrani: Google OAuth + e-posta (dogrulama mailli).
@@ -26,11 +27,15 @@ class _AuthScreenState extends State<AuthScreen> {
     try {
       if (_registerMode) {
         await _auth.signUp(_email.text.trim(), _password.text);
+        Analytics.capture('sign_up');
         setState(() => _message =
             'Doğrulama e-postası gönderildi. Gelen kutunu kontrol edip '
             'linke tıkladıktan sonra giriş yapabilirsin.');
       } else {
         await _auth.signIn(_email.text.trim(), _password.text);
+        final user = _auth.currentUser;
+        if (user != null) Analytics.identify(user.id, {'email': user.email});
+        Analytics.capture('login', {'method': 'email'});
         if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {

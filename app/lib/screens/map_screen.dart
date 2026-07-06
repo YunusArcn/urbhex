@@ -9,6 +9,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../models/hex_score.dart';
 import '../models/incident.dart';
+import '../services/analytics/analytics.dart';
 import '../services/auth_service.dart';
 import '../services/location_service.dart';
 import '../services/supabase_service.dart';
@@ -127,6 +128,10 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _scanVisibleArea() async {
     setState(() => _scanning = true);
     final b = _mapController.camera.visibleBounds;
+    Analytics.capture('scan_click', {
+      'lat': _mapController.camera.center.latitude,
+      'lng': _mapController.camera.center.longitude,
+    });
     try {
       final id = await _service.requestScan(
         minLat: b.south, minLng: b.west, maxLat: b.north, maxLng: b.east,
@@ -207,6 +212,7 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _pickSuggestion((String, LatLng) s) {
+    Analytics.capture('search_pick', {'place': s.$1});
     _searchController.text = s.$1.split(',').first;
     setState(() => _suggestions = []);
     _mapController.move(s.$2, 13.5);
@@ -463,6 +469,11 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   void _onHexTapped(HexScore hex) {
+    Analytics.capture('hex_tap', {
+      'safety_score': hex.safetyScore,
+      'incident_count': hex.incidentCount,
+      'top_event_type': hex.topEventType,
+    });
     final ff = formFactorOf(context);
     if (ff.sidePanel) {
       showDialog(
