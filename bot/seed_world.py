@@ -104,11 +104,17 @@ async def run(only: str, per_city: int, days: int, rotate: int = 0) -> None:
                 # Ücretsiz AI katmanlarının dakika limitine takılmamak için tempo.
                 await asyncio.sleep(2)
             except Exception as exc:
-                # Kredi bittiyse boşa dönmeye devam etme: net mesajla DUR.
-                if "credit balance" in str(exc).lower():
-                    print("\n[seed] DURDU: Anthropic API kredisi bitti! "
-                          "console.anthropic.com > Plans & Billing'den kredi "
-                          "yükleyin; betik kaldığı yerden devam eder.")
+                # Kredi bittiyse ve ÜCRETSİZ sağlayıcı da yoksa DUR.
+                # (Gemini/Groq tanımlıysa 429'ları parser bekleyerek aşar;
+                #  Anthropic'in kredi hatası tek başına koşuyu öldürmemeli.)
+                import os as _os
+
+                if "credit balance" in str(exc).lower() and not (
+                        _os.environ.get("GEMINI_API_KEY")
+                        or _os.environ.get("GROQ_API_KEY")):
+                    print("\n[seed] DURDU: Anthropic API kredisi bitti ve "
+                          "ücretsiz sağlayıcı tanımlı değil! GEMINI/GROQ "
+                          "anahtarı ekleyin veya kredi yükleyin.")
                     raise SystemExit(2) from exc
                 stats["hata"] += 1
                 if stats["hata"] <= 3:  # ilk hataları göster (sessiz yutma yok)

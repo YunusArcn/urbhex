@@ -119,29 +119,41 @@ _rr = 0  # round-robin: ücretsizler sırayla öne geçer
 
 
 def _ask(system: str, user: str) -> dict:
+    """Sağlayıcı zinciri + sabır: ücretsiz kotalar ANLIK dolarsa 65 sn nefes
+    alıp yeniden dener (4 tura kadar). Ücretsiz katmanın 429'u geçicidir —
+    koşuyu öldürmek yerine beklemek neredeyse her zaman kazanır."""
     global _rr
-    now = time.time()
-    free = [p for p in _FREE if os.environ.get(p[2])]
-    if free:
-        shift = _rr % len(free)
-        free = free[shift:] + free[:shift]
-        _rr += 1
-    chain = free + [p for p in _PAID if os.environ.get(p[2])]
-    if not chain:
-        raise RuntimeError("Hiçbir AI anahtarı tanımlı değil (GEMINI/GROQ/ANTHROPIC)")
+    free_configured = any(os.environ.get(p[2]) for p in _FREE)
 
     last: Exception | None = None
-    for name, fn, _ in chain:
-        if _cooldown.get(name, 0) > now:
-            continue
-        try:
-            return fn(system, user)
-        except Exception as exc:
-            last = exc
-            msg = str(exc).lower()
-            if any(k in msg for k in ("429", "quota", "rate", "exhaust", "credit", "overload")):
-                _cooldown[name] = now + 600  # kota/hız: 10 dk dinlendir
-            print(f"[parser] {name} hata: {str(exc)[:140]}")
+    for round_no in range(4):
+        now = time.time()
+        free = [p for p in _FREE if os.environ.get(p[2])]
+        if free:
+            shift = _rr % len(free)
+            free = free[shift:] + free[:shift]
+            _rr += 1
+        chain = free + [p for p in _PAID if os.environ.get(p[2])]
+        if not chain:
+            raise RuntimeError("Hiçbir AI anahtarı tanımlı değil (GEMINI/GROQ/ANTHROPIC)")
+
+        for name, fn, _ in chain:
+            if _cooldown.get(name, 0) > now:
+                continue
+            try:
+                return fn(system, user)
+            except Exception as exc:
+                last = exc
+                msg = str(exc).lower()
+                if any(k in msg for k in ("429", "quota", "rate", "exhaust", "credit", "overload")):
+                    _cooldown[name] = now + 65  # kısa dinlenme (dakika kotası)
+                print(f"[parser] {name} hata: {str(exc)[:140]}")
+
+        if round_no < 3 and free_configured:
+            print(f"[parser] ücretsiz kotalar dolu — 70 sn beklenip yeniden denenecek "
+                  f"(tur {round_no + 1}/3)")
+            time.sleep(70)
+
     raise RuntimeError(f"Tüm AI sağlayıcılar başarısız: {last}")
 
 

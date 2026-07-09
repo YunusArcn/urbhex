@@ -15,6 +15,7 @@ Kullanım: python scan_worker.py     (Actions'ta saatlik; lokalde elle)
 """
 import asyncio
 import json
+import os
 import re
 import urllib.parse
 import urllib.request
@@ -233,9 +234,12 @@ async def run() -> None:
                     stats[result] += 1
                     known.add(item["link"])
                 except Exception as exc:
-                    if "credit balance" in str(exc).lower():
-                        print("[scan_worker] DURDU: Anthropic API kredisi bitti! "
-                              "console.anthropic.com > Plans & Billing.")
+                    if "credit balance" in str(exc).lower() and not (
+                            os.environ.get("GEMINI_API_KEY")
+                            or os.environ.get("GROQ_API_KEY")):
+                        print("[scan_worker] DURDU: Anthropic kredisi bitti ve "
+                              "ücretsiz sağlayıcı yok! GEMINI/GROQ anahtarı "
+                              "ekleyin veya kredi yükleyin.")
                         raise SystemExit(2) from exc
                     print(f"[scan_worker] haber hatası: {exc}")
 
