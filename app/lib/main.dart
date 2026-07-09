@@ -3,7 +3,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'screens/map_screen.dart';
-import 'screens/onboarding_screen.dart';
 
 // Frontend'e SADECE anon key konur (RLS herkese okuma izni verir).
 // Derleme: flutter run --dart-define=SUPABASE_URL=... --dart-define=SUPABASE_ANON_KEY=...
@@ -14,16 +13,16 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
   final prefs = await SharedPreferences.getInstance();
-  runApp(HabitexApp(
+  runApp(UrbhexApp(
     onboarded: prefs.getBool('onboarded') ?? false,
     purpose: prefs.getString('purpose') ?? 'kesif',
   ));
 }
 
-class HabitexApp extends StatelessWidget {
+class UrbhexApp extends StatelessWidget {
   final bool onboarded;
   final String purpose;
-  const HabitexApp({super.key, required this.onboarded, required this.purpose});
+  const UrbhexApp({super.key, required this.onboarded, required this.purpose});
 
   @override
   Widget build(BuildContext context) {
@@ -34,14 +33,13 @@ class HabitexApp extends StatelessWidget {
         colorSchemeSeed: const Color(0xFF1B5E20),
         useMaterial3: true,
       ),
-      // Ilk ziyaret: amac secimi. Sonraki ziyaretler: dogrudan harita
-      // (logo animasyonu yok — sinematik yaklasma karsilar).
-      home: onboarded
-          ? MapScreen(
-              startDetailed: purpose == 'tasinma',
-              startPanelOpen: purpose != 'kesif',
-            )
-          : const OnboardingScreen(),
+      // Uygulama HER ZAMAN canli haritayla acilir; ilk ziyarette amac
+      // kartlari haritanin USTUNDE yuzer (beyaz bekleme ekrani yok).
+      home: MapScreen(
+        startDetailed: onboarded && purpose == 'tasinma',
+        startPanelOpen: onboarded ? purpose != 'kesif' : null,
+        showOnboarding: !onboarded,
+      ),
     );
   }
 }

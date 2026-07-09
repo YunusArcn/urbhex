@@ -42,4 +42,13 @@ ASAYIS_KEYWORDS = [
     "murder", "homicide", "robbery", "shooting", "shot", "assault", "theft",
     "burglary", "stabbing", "stabbed", "crash", "accident", "police",
     "arrested", "drug", "killed", "injured", "gunman", "carjack",
+    # Almanca / Fransızca / İspanyolca / İtalyanca / Portekizce
+    "mord", "raub", "überfall", "diebstahl", "einbruch", "unfall", "polizei",
+    "festgenommen", "meurtre", "braquage", "fusillade", "agression",
+    "cambriolage", "asesinato", "tiroteo", "agresión", "hurto", "apuñal",
+    "detenido", "omicidio", "rapina", "sparatoria", "furto", "incidente",
+    "assassinato", "assalto", "tiroteio", "roubo", "acidente",
+    # Rusça / Arapça / Japonca / Korece (temel)
+    "убийство", "ограбление", "стрельба", "кража", "дтп", "قتل", "سطو",
+    "سرقة", "殺人", "強盗", "窃盗", "살인", "강도", "절도",
 ]

@@ -33,23 +33,59 @@ MAX_ITEMS_PER_CITY = 15  # hiz: ilk turda 15 haber (kalanlar sonraki turlarda ge
 
 _UA = {"User-Agent": "UrbhexBot/0.1 (+https://urbhex.com)"}
 
-# Ülke kodu → Google News yereli (hl, gl, ceid) ve sorgu dili.
+# Ülke kodu → Google News yereli (hl, gl, ceid). Nereye bakılırsa ORANIN dili.
 _LOCALES = {
     "tr": ("tr", "TR", "TR:tr"),
     "us": ("en-US", "US", "US:en"),
     "gb": ("en-GB", "GB", "GB:en"),
+    "au": ("en-AU", "AU", "AU:en"),
+    "ca": ("en-CA", "CA", "CA:en"),
+    "in": ("en-IN", "IN", "IN:en"),
     "de": ("de", "DE", "DE:de"),
+    "at": ("de", "AT", "AT:de"),
+    "ch": ("de", "CH", "CH:de"),
     "fr": ("fr", "FR", "FR:fr"),
+    "be": ("fr", "BE", "BE:fr"),
     "es": ("es", "ES", "ES:es"),
+    "mx": ("es-419", "MX", "MX:es-419"),
+    "ar": ("es-419", "AR", "AR:es-419"),
     "it": ("it", "IT", "IT:it"),
     "nl": ("nl", "NL", "NL:nl"),
+    "pt": ("pt-PT", "PT", "PT:pt-150"),
+    "br": ("pt-BR", "BR", "BR:pt-419"),
+    "ru": ("ru", "RU", "RU:ru"),
+    "ua": ("uk", "UA", "UA:uk"),
+    "jp": ("ja", "JP", "JP:ja"),
+    "kr": ("ko", "KR", "KR:ko"),
+    "sa": ("ar", "SA", "SA:ar"),
+    "ae": ("ar", "AE", "AE:ar"),
+    "eg": ("ar", "EG", "EG:ar"),
+    "az": ("az", "AZ", "AZ:az"),
 }
 _DEFAULT_LOCALE = ("en-US", "US", "US:en")  # bilinmeyen ülke → İngilizce
 
-_CRIME_QUERY_TR = ('(cinayet OR gasp OR hırsızlık OR kavga OR yaralandı '
-                   'OR "trafik kazası" OR uyuşturucu OR "silahlı saldırı")')
-_CRIME_QUERY_EN = ('(murder OR robbery OR shooting OR assault OR theft '
-                   'OR burglary OR stabbing OR "car crash")')
+# Dil → asayiş sorgusu (YEREL dilde aranır; AI özeti her zaman Türkçe üretir).
+_CRIME_QUERIES = {
+    "tr": '(cinayet OR gasp OR hırsızlık OR kavga OR yaralandı OR "trafik kazası" OR uyuşturucu OR "silahlı saldırı")',
+    "en": '(murder OR robbery OR shooting OR assault OR theft OR burglary OR stabbing OR "car crash")',
+    "de": '(Mord OR Raubüberfall OR Schießerei OR Überfall OR Diebstahl OR Einbruch OR Messerangriff OR Verkehrsunfall)',
+    "fr": '(meurtre OR braquage OR fusillade OR agression OR vol OR cambriolage OR "accident de la route")',
+    "es": '(asesinato OR robo OR tiroteo OR agresión OR hurto OR "accidente de tráfico" OR apuñalamiento)',
+    "it": '(omicidio OR rapina OR sparatoria OR aggressione OR furto OR "incidente stradale")',
+    "nl": '(moord OR overval OR schietpartij OR mishandeling OR diefstal OR inbraak OR verkeersongeval)',
+    "pt": '(assassinato OR assalto OR tiroteio OR agressão OR furto OR roubo OR "acidente de trânsito")',
+    "ru": '(убийство OR ограбление OR стрельба OR нападение OR кража OR ДТП)',
+    "uk": '(вбивство OR пограбування OR стрілянина OR напад OR крадіжка OR ДТП)',
+    "ja": '(殺人 OR 強盗 OR 発砲 OR 暴行 OR 窃盗 OR 交通事故)',
+    "ko": '(살인 OR 강도 OR 총격 OR 폭행 OR 절도 OR 교통사고)',
+    "ar": '(قتل OR سطو OR إطلاق نار OR اعتداء OR سرقة OR "حادث مرور")',
+    "az": '(qətl OR quldurluq OR atışma OR hücum OR oğurluq OR "yol qəzası")',
+}
+
+
+def _lang_of(country_code: str | None) -> str:
+    hl, _, _ = _LOCALES.get((country_code or "").lower(), _DEFAULT_LOCALE)
+    return hl.split("-")[0]
 
 
 def _http_get(url: str) -> bytes:
@@ -84,7 +120,7 @@ def fetch_google_news(
     """
     hl, gl, ceid = _LOCALES.get((country_code or "").lower(), _DEFAULT_LOCALE)
     if query is None:
-        crime = _CRIME_QUERY_TR if (country_code or "").lower() == "tr" else _CRIME_QUERY_EN
+        crime = _CRIME_QUERIES.get(_lang_of(country_code), _CRIME_QUERIES["en"])
         query = f'"{city}" {crime} when:{days}d'
     url = ("https://news.google.com/rss/search?q="
            f"{urllib.parse.quote(query)}&hl={hl}&gl={gl}&ceid={ceid}")

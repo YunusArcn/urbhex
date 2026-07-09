@@ -349,5 +349,235 @@
  "New York, United States": [
   40.7127281,
   -74.0060152
+ ],
+ "Adana, Türkiye": [
+  36.9863599,
+  35.3252861
+ ],
+ "Kozan, Adana, Türkiye": [
+  37.4477857,
+  35.8166308
+ ],
+ "Adıyaman, Türkiye": [
+  37.78936,
+  38.3141101
+ ],
+ "Merkez, Adıyaman, Türkiye": [
+  38.0284385,
+  38.6217561
+ ],
+ "Afyonkarahisar, Türkiye": [
+  38.6852729,
+  30.6427411
+ ],
+ "Emirdağ, Afyonkarahisar, Türkiye": [
+  39.0195014,
+  31.1502583
+ ],
+ "Afyon, Türkiye": [
+  38.6852729,
+  30.6427411
+ ],
+ "Ağrı, Türkiye": [
+  39.52916,
+  43.3835645
+ ],
+ "Gürbulak, Ağrı, Türkiye": [
+  39.4181258,
+  44.352677
+ ],
+ "Samandağ, Hatay, Türkiye": [
+  36.0851597,
+  35.9799375
+ ],
+ "Şemdinli, Hakkari, Türkiye": [
+  37.3067629,
+  44.5725083
+ ],
+ "Bursa, Türkiye": [
+  40.1825734,
+  29.0675039
+ ],
+ "Patnos, Ağrı, Türkiye": [
+  39.2334202,
+  42.8612338
+ ],
+ "Amasya, Türkiye": [
+  40.6569451,
+  35.7727169
+ ],
+ "Merzifon, Amasya, Türkiye": [
+  40.8721392,
+  35.4635383
+ ],
+ "Taşova, Amasya, Türkiye": [
+  40.7603491,
+  36.321973
+ ],
+ "Kırıkkale, Türkiye": [
+  39.8860105,
+  33.8278992
+ ],
+ "Ankara, Türkiye": [
+  39.9207759,
+  32.8540497
+ ],
+ "Akyurt, Ankara, Türkiye": [
+  40.1307529,
+  33.0870676
+ ],
+ "Antalya, Türkiye": [
+  36.8865728,
+  30.7030242
+ ],
+ "Manavgat, Antalya, Türkiye": [
+  36.7870124,
+  31.4406667
+ ],
+ "Artvin, Türkiye": [
+  41.160506,
+  41.8398627
+ ],
+ "Erzurum, Türkiye": [
+  39.90632,
+  41.2727715
+ ],
+ "Trabzon, Türkiye": [
+  41.0054605,
+  39.7301463
+ ],
+ "Samsun, Türkiye": [
+  41.2303557,
+  35.9683338
+ ],
+ "Aydın, Türkiye": [
+  37.7405798,
+  28.0676404
+ ],
+ "Kuşadası, Aydın, Türkiye": [
+  37.8632398,
+  27.266873
+ ],
+ "Bozdoğan, Aydın, Türkiye": [
+  37.6739133,
+  28.3132041
+ ],
+ "Balıkesir, Türkiye": [
+  39.5400798,
+  28.0228793
+ ],
+ "Gökçeyazı, Balıkesir, Türkiye": [
+  39.6277901,
+  27.6307494
+ ],
+ "Dursunbey, Balıkesir, Türkiye": [
+  39.5472927,
+  28.6529869
+ ],
+ "Savaştepe, Balıkesir, Türkiye": [
+  39.382701,
+  27.6501908
+ ],
+ "Bilecik, Türkiye": [
+  40.1543234,
+  30.1479907
+ ],
+ "Bayırköy, Bilecik, Türkiye": [
+  40.2824556,
+  30.0180026
+ ],
+ "Gülümbe, Bilecik, Türkiye": [
+  40.201622,
+  29.9670597
+ ],
+ "Bingöl, Türkiye": [
+  39.073803,
+  40.7296181
+ ],
+ "Bingöl, Erzurum, Türkiye": null,
+ "Bitlis, Türkiye": [
+  38.4950867,
+  42.1678372
+ ],
+ "Tatvan, Bitlis, Türkiye": [
+  38.4931961,
+  42.2878112
+ ],
+ "Bolu, Türkiye": [
+  40.6212099,
+  31.6460259
+ ],
+ "Burdur, Türkiye": [
+  37.5183407,
+  30.1691254
+ ],
+ "Fethiye, Muğla, Türkiye": [
+  36.6221154,
+  29.1153384
+ ],
+ "Çanakkale, Türkiye": [
+  40.0549886,
+  26.9278292
+ ],
+ "Gelibolu, Çanakkale, Türkiye": [
+  40.4054063,
+  26.6722539
+ ],
+ "Çankırı, Türkiye": [
+  40.6667691,
+  33.4526069
+ ],
+ "Bozkır Köyü, Çankırı, Türkiye": null,
+ "Çorum, Türkiye": [
+  40.5698389,
+  34.7269292
+ ],
+ "Merkez, Çorum, Türkiye": [
+  40.5499106,
+  34.9537344
+ ],
+ "Denizli, Türkiye": [
+  37.8275892,
+  29.2389539
+ ],
+ "Pamukkale, Denizli, Türkiye": [
+  37.9200382,
+  29.1217529
+ ],
+ "Diyarbakır, Türkiye": [
+  37.9162222,
+  40.2363542
+ ],
+ "Sur, Diyarbakır, Türkiye": [
+  37.9110723,
+  40.2366499
+ ],
+ "Yeniköy, Uzunköprü, Edirne, Türkiye": [
+  41.3427692,
+  26.7660443
+ ],
+ "Edirne, Türkiye": [
+  41.6759327,
+  26.5587225
+ ],
+ "Hasköy, Havsa, Edirne, Türkiye": [
+  41.639212,
+  26.857925
+ ],
+ "Elazığ, Türkiye": [
+  38.5824771,
+  39.396179
+ ],
+ "Tunceli, Türkiye": [
+  39.2197553,
+  39.4139674
+ ],
+ "Erzincan, Türkiye": [
+  39.6073429,
+  39.2013209
+ ],
+ "Eskişehir, Türkiye": [
+  39.7743941,
+  30.519116
  ]
 }

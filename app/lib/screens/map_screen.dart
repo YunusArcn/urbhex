@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/hex_score.dart';
 import '../models/incident.dart';
@@ -28,7 +29,17 @@ class MapScreen extends StatefulWidget {
   /// tasinma → ayrintili altlik; haber → sade + panel acik.
   final bool startDetailed;
   final bool? startPanelOpen;
-  const MapScreen({super.key, this.startDetailed = false, this.startPanelOpen});
+
+  /// true: ilk ziyaret — amac kartlari CANLI haritanin ustunde yuzer
+  /// (beyaz bekleme ekrani yok; arkada sinematik yaklasma oynar).
+  final bool showOnboarding;
+
+  const MapScreen({
+    super.key,
+    this.startDetailed = false,
+    this.startPanelOpen,
+    this.showOnboarding = false,
+  });
 
   @override
   State<MapScreen> createState() => _MapScreenState();
@@ -45,7 +56,7 @@ const _dateFilters = [
 ];
 
 class _MapScreenState extends State<MapScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _izmitCenter = LatLng(40.7654, 29.9408);
   static const _turkiyeOverview = LatLng(39.2, 34.9); // sinematik baslangic
   static const _detailZoom = 13.0;
@@ -74,6 +85,14 @@ class _MapScreenState extends State<MapScreen>
   static const _guestLimitKm = 40.0;
   LatLng? _guestAnchor;
   bool _limitDialogOpen = false;
+
+  // Onboarding kaplamasi (ilk ziyaret) + gec verilen konum iznini yakalama.
+  late bool _onboardingVisible = widget.showOnboarding;
+  late final AnimationController _onbCtrl = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1100));
+  Timer? _permRetry;
+  int _permTries = 0;
+  bool _userMovedMap = false; // kullanici elle gezdiyse otomatik isinlama yapma
   bool _scanning = false;
   double _zoom = 13;
   Timer? _debounce;
@@ -84,7 +103,8 @@ class _MapScreenState extends State<MapScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showDisclaimer();
+      if (!_onboardingVisible) _showDisclaimer();
+      if (_onboardingVisible) _onbCtrl.forward();
       _panelOpen =
           widget.startPanelOpen ?? (formFactorOf(context) != FormFactor.mobile);
       _runCinematicIntro();
@@ -112,8 +132,11 @@ class _MapScreenState extends State<MapScreen>
   /// Sinematik karsilama: harita Turkiye genelinden kullanicinin bolgesine
   /// yumusak bir egriyle suzulerek yaklasir (logo animasyonunun yerini aldi).
   Future<void> _runCinematicIntro() async {
-    final target = await LocationService.currentPosition() ?? _izmitCenter;
+    final located = await LocationService.currentPosition();
+    final target = located ?? _izmitCenter;
     if (!mounted) return;
+    // Izin (henuz) yoksa: kullanici izni GEC verirse otomatik yakala.
+    if (located == null) _startLocationRetry();
     const startZoom = 5.2;
     const endZoom = 13.5;
     final anim =
@@ -138,6 +161,27 @@ class _MapScreenState extends State<MapScreen>
     _zoom = endZoom;
     _guestAnchor = target; // misafir turu bu noktaya demirler
     _reloadData();
+  }
+
+  /// Konum izni sinematik giristen SONRA verilirse: GPS butonuna gerek
+  /// kalmadan otomatik yakala, bolgeye isinla ve veriyi hemen cek.
+  void _startLocationRetry() {
+    _permRetry?.cancel();
+    _permTries = 0;
+    _permRetry = Timer.periodic(const Duration(seconds: 4), (t) async {
+      if (!mounted || _userMovedMap || _permTries++ > 25) {
+        t.cancel();
+        return;
+      }
+      final pos = await LocationService.positionIfGranted();
+      if (pos == null || !mounted || _userMovedMap) return;
+      t.cancel();
+      _guestAnchor = pos; // misafir turu gercek konuma demirlenir
+      _mapController.move(pos, 13.5);
+      _zoom = 13.5;
+      _toast('Konum izni alındı — bölgene ışınlandın 📍');
+      _reloadData(); // bolge bossa otomatik tarama zinciri de tetiklenir
+    });
   }
 
   Future<void> _startFromUserLocation() async {
@@ -216,6 +260,9 @@ class _MapScreenState extends State<MapScreen>
 
   void _onMapMoved(MapEvent event) {
     if (_introRunning) return; // yaklasma sirasinda veri cekme/spam yok
+    if (event.source != MapEventSource.mapController) {
+      _userMovedMap = true; // elle gezinti: otomatik konum isinlamasi iptal
+    }
     _zoom = _mapController.camera.zoom;
     if (_checkGuestLimit()) return; // sinir asildi: geri cek + davet goster
     _debounce?.cancel();
@@ -463,6 +510,7 @@ class _MapScreenState extends State<MapScreen>
         ),
         if (_panelOpen) _buildNewsPanel(ff),
         _buildTopBar(ff),
+        if (_onboardingVisible) _buildOnboardingOverlay(),
       ]),
       floatingActionButton: Column(
         mainAxisSize: MainAxisSize.min,
@@ -493,6 +541,158 @@ class _MapScreenState extends State<MapScreen>
             child: const Icon(Icons.my_location),
           ),
         ],
+      ),
+    );
+  }
+
+  // ---------------- ONBOARDING KAPLAMASI (canli haritanin ustunde) --------
+
+  Future<void> _pickPurpose(String purpose) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarded', true);
+    await prefs.setString('purpose', purpose);
+    Analytics.capture('onboarding_purpose', {'purpose': purpose});
+    if (!mounted) return;
+    setState(() {
+      _onboardingVisible = false;
+      _detailedTiles = purpose == 'tasinma';
+      if (purpose == 'haber') _panelOpen = true;
+    });
+    _showDisclaimer();
+  }
+
+  Widget _onbCard({
+    required int index,
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required String purpose,
+  }) {
+    final anim = CurvedAnimation(
+      parent: _onbCtrl,
+      curve: Interval(0.15 + index * 0.18, 0.6 + index * 0.18,
+          curve: Curves.easeOutCubic),
+    );
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (context, child) => Opacity(
+        opacity: anim.value,
+        child: Transform.translate(
+            offset: Offset(0, 28 * (1 - anim.value)), child: child),
+      ),
+      child: Card(
+        elevation: 4,
+        margin: const EdgeInsets.symmetric(vertical: 7),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _pickPurpose(purpose),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(children: [
+              Container(
+                padding: const EdgeInsets.all(11),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: color, size: 28),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title,
+                          style: const TextStyle(
+                              fontSize: 15.5, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text(subtitle,
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600)),
+                    ]),
+              ),
+              const Icon(Icons.arrow_forward_ios, size: 15),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Ilk ziyaret: amac kartlari, ARKASI GORUNEN hafif karartma uzerinde —
+  /// sinematik yaklasma ve haberler kartlarin arkasinda oynamaya devam eder.
+  Widget _buildOnboardingOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withOpacity(0.28),
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Card(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(18)),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                    child: Column(children: [
+                      const Icon(Icons.hexagon,
+                          size: 40, color: Color(0xFF1B5E20)),
+                      Text.rich(
+                        const TextSpan(children: [
+                          TextSpan(
+                              text: 'urb',
+                              style: TextStyle(fontWeight: FontWeight.w300)),
+                          TextSpan(
+                              text: 'hex',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1B5E20))),
+                        ]),
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Hoş geldin! Arkada haritan şimdiden hazırlanıyor.\n'
+                        'Urbhex\'i ne için kullanacaksın?',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13.5),
+                      ),
+                      const SizedBox(height: 6),
+                    ]),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                _onbCard(
+                  index: 0,
+                  icon: Icons.home_work,
+                  color: const Color(0xFF1B5E20),
+                  title: 'Taşınma / ev arama',
+                  subtitle: 'Ayrıntılı harita ve bölge olanaklarıyla başla',
+                  purpose: 'tasinma',
+                ),
+                _onbCard(
+                  index: 1,
+                  icon: Icons.newspaper,
+                  color: const Color(0xFF283593),
+                  title: 'Haber & asayiş takibi',
+                  subtitle: 'Sade harita ve bölgendeki olay akışıyla başla',
+                  purpose: 'haber',
+                ),
+                _onbCard(
+                  index: 2,
+                  icon: Icons.explore,
+                  color: const Color(0xFFBF360C),
+                  title: 'Sadece keşfediyorum',
+                  subtitle: 'Haritayı özgürce gez, gerisini sonra ayarlarsın',
+                  purpose: 'kesif',
+                ),
+              ]),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -978,6 +1178,8 @@ class _MapScreenState extends State<MapScreen>
     _searchDebounce?.cancel();
     _searchController.dispose();
     _introCtrl.dispose();
+    _onbCtrl.dispose();
+    _permRetry?.cancel();
     super.dispose();
   }
 }

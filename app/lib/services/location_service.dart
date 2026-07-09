@@ -28,4 +28,25 @@ class LocationService {
       return null;
     }
   }
+
+  /// Izin SORMADAN sessiz kontrol: kullanici izni sonradan verdiyse yakalar.
+  /// (Tarayici izin kutusunu geç onaylayanlar için otomatik yenileme.)
+  static Future<LatLng?> positionIfGranted() async {
+    try {
+      final perm = await Geolocator.checkPermission();
+      if (perm != LocationPermission.whileInUse &&
+          perm != LocationPermission.always) {
+        return null;
+      }
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 6),
+        ),
+      );
+      return LatLng(pos.latitude, pos.longitude);
+    } catch (_) {
+      return null;
+    }
+  }
 }
