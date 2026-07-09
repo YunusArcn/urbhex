@@ -48,7 +48,11 @@ ASAYIS_KEYWORDS = [
     "cambriolage", "asesinato", "tiroteo", "agresión", "hurto", "apuñal",
     "detenido", "omicidio", "rapina", "sparatoria", "furto", "incidente",
     "assassinato", "assalto", "tiroteio", "roubo", "acidente",
-    # Rusça / Arapça / Japonca / Korece (temel)
-    "убийство", "ограбление", "стрельба", "кража", "дтп", "قتل", "سطو",
-    "سرقة", "殺人", "強盗", "窃盗", "살인", "강도", "절도",
+    # Felemenkçe (sorgu dili nl iken filtre de tanımalı!)
+    "moord", "overval", "schietpartij", "mishandeling", "diefstal",
+    "inbraak", "steekpartij", "ongeval", "politie", "aangehouden",
+    # Rusça / Ukraynaca / Arapça / Japonca / Korece / Azerice (temel)
+    "убийство", "ограбление", "стрельба", "кража", "дтп", "вбивство",
+    "пограбування", "قتل", "سطو", "سرقة", "حادث", "殺人", "強盗", "窃盗",
+    "事故", "살인", "강도", "절도", "사고", "qətl", "oğurluq", "qəza",
 ]
