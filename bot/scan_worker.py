@@ -233,6 +233,10 @@ async def run() -> None:
                     stats[result] += 1
                     known.add(item["link"])
                 except Exception as exc:
+                    if "credit balance" in str(exc).lower():
+                        print("[scan_worker] DURDU: Anthropic API kredisi bitti! "
+                              "console.anthropic.com > Plans & Billing.")
+                        raise SystemExit(2) from exc
                     print(f"[scan_worker] haber hatası: {exc}")
 
             client.table("scan_requests").update({

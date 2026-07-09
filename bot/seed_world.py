@@ -101,8 +101,16 @@ async def run(only: str, per_city: int, days: int, rotate: int = 0) -> None:
                 r = process_item(item, city, known, country=country, country_code=cc)
                 stats[r] += 1
                 known.add(item["link"])
-            except Exception:
+            except Exception as exc:
+                # Kredi bittiyse boşa dönmeye devam etme: net mesajla DUR.
+                if "credit balance" in str(exc).lower():
+                    print("\n[seed] DURDU: Anthropic API kredisi bitti! "
+                          "console.anthropic.com > Plans & Billing'den kredi "
+                          "yükleyin; betik kaldığı yerden devam eder.")
+                    raise SystemExit(2) from exc
                 stats["hata"] += 1
+                if stats["hata"] <= 3:  # ilk hataları göster (sessiz yutma yok)
+                    print(f"[seed]   hata örneği: {exc}")
         total.update(stats)
         print(f"[seed] {n}/{len(targets)} {city} ({cc}): {dict(stats)}")
 
