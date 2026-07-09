@@ -1,19 +1,42 @@
-# URBHEX botu — GitHub Actions ile bulutta ÜCRETSİZ zamanlı çalıştırma.
-# Kurulum: repo'yu GitHub'a push'la → Settings → Secrets and variables → Actions →
-# şu 3 secret'ı ekle: SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY
-# (Actions sekmesinden "Run workflow" ile elle de tetiklenebilir.)
+# URBHEX botlari — GitHub Actions ile bulutta zamanli calisir.
+# Kurulum: repo Settings > Secrets and variables > Actions:
+#   SUPABASE_URL, SUPABASE_SERVICE_KEY, ANTHROPIC_API_KEY
+#   (istege bagli e-posta: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS)
+#
+# TASARIM NOTLARI:
+# - TEK saatlik cron; her koşuda TUM adimlar calisir (kosullu adim yok —
+#   "hangi cron tetikledi" karmasasi kalkti, teshis kolaylasti).
+# - Dakika :17 secildi: GitHub :00/:30'da yigilma yasar, cron'lar gecikir/atlanir.
+#   Yine de Actions cron "en iyi caba"dir; gecikme goruursen Actions sekmesinden
+#   "Run workflow" ile elle tetikleyebilirsin.
+# - seed_world --rotate 18: her saat dunya listesinin farkli 18 sehri tazelenir
+#   → 137 sehir ~8 saatte bir tam tur atar, tek kosu sure sinirina sigar.
+# - continue-on-error: bir adim patlarsa digerleri calismaya devam eder.
+# - bot/geo_cache.json cache'lenir: Nominatim'e ayni yerler tekrar sorulmaz.
 name: urbhex-bot
 
 on:
   schedule:
-    - cron: "0 */6 * * *"   # yerel kaynak taraması: 6 saatte bir
-    - cron: "30 * * * *"    # GDELT global: saatte bir
+    - cron: "17 * * * *"   # her saat :17'de
   workflow_dispatch: {}
+
+concurrency:
+  group: urbhex-bot
+  cancel-in-progress: false
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  SMTP_HOST: ${{ secrets.SMTP_HOST }}
+  SMTP_PORT: ${{ secrets.SMTP_PORT }}
+  SMTP_USER: ${{ secrets.SMTP_USER }}
+  SMTP_PASS: ${{ secrets.SMTP_PASS }}
 
 jobs:
   bot:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -25,40 +48,34 @@ jobs:
 
       - run: pip install -r bot/requirements.txt
 
-      - name: Yerel kaynak taraması (6 saatlik tetikte)
-        if: github.event.schedule == '0 */6 * * *' || github.event_name == 'workflow_dispatch'
-        working-directory: bot
-        run: python main.py
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      - name: Coğrafi kodlama önbelleği (Nominatim tekrarını önler)
+        uses: actions/cache@v4
+        with:
+          path: bot/geo_cache.json
+          key: geo-cache-${{ github.run_id }}
+          restore-keys: geo-cache-
 
-      - name: GDELT global tarama (saatlik tetikte)
-        if: github.event.schedule == '30 * * * *' || github.event_name == 'workflow_dispatch'
-        working-directory: bot
-        run: python gdelt.py
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
-
-      - name: Bölge tarama kuyruğu (kullanıcı istekleri — saatlik tetikte)
-        if: github.event.schedule == '30 * * * *' || github.event_name == 'workflow_dispatch'
+      - name: 1) Kullanıcı tarama kuyruğu (en öncelikli — bekleyen var mı?)
+        continue-on-error: true
         working-directory: bot
         run: python scan_worker.py
-        env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          SMTP_HOST: ${{ secrets.SMTP_HOST }}
-          SMTP_PORT: ${{ secrets.SMTP_PORT }}
-          SMTP_USER: ${{ secrets.SMTP_USER }}
-          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+
+      - name: 2) Dünya döner dilimi (her saat 18 şehir tazelenir)
+        continue-on-error: true
+        working-directory: bot
+        run: python seed_world.py --rotate 18 --per-city 5 --days 2
+
+      - name: 3) GDELT global akış (koordinatlı olaylar)
+        continue-on-error: true
+        working-directory: bot
+        run: python gdelt.py
+
+      - name: 4) Kocaeli yerel basın (mahalle hassasiyeti)
+        continue-on-error: true
+        working-directory: bot
+        run: python main.py
+
+      - name: 5) Kuyruğu son kez süpür (koşu sırasında gelen istekler)
+        continue-on-error: true
+        working-directory: bot
+        run: python scan_worker.py

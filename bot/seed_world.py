@@ -67,12 +67,23 @@ WORLD_CITIES = [
 ]
 
 
-async def run(only: str, per_city: int, days: int) -> None:
+async def run(only: str, per_city: int, days: int, rotate: int = 0) -> None:
     targets: list[tuple[str, str, str]] = []
     if only in ("tr", "all"):
         targets += [(il, "Türkiye", "tr") for il in TR_ILLER]
     if only in ("world", "all"):
         targets += WORLD_CITIES
+
+    # DÖNEN DİLİM modu (GitHub Actions saatlik): her saat listenin farklı bir
+    # parçası taranır → tüm dünya birkaç saatte bir tamamen tazelenir, tek
+    # koşu Actions'ın süre sınırına sığar.
+    if rotate > 0:
+        import time
+
+        slices = max(1, -(-len(targets) // rotate))  # tavan bölme
+        idx = int(time.time() // 3600) % slices
+        targets = targets[idx * rotate:(idx + 1) * rotate]
+        print(f"[seed] Dönen dilim {idx + 1}/{slices}: {[t[0] for t in targets]}")
 
     known = db.known_source_urls()
     total: Counter = Counter()
@@ -103,5 +114,7 @@ if __name__ == "__main__":
     ap.add_argument("--only", choices=["tr", "world", "all"], default="all")
     ap.add_argument("--per-city", type=int, default=8)
     ap.add_argument("--days", type=int, default=7)
+    ap.add_argument("--rotate", type=int, default=0,
+                    help="Saatlik dönen dilim boyutu (0 = tüm liste tek seferde)")
     args = ap.parse_args()
-    asyncio.run(run(args.only, args.per_city, args.days))
+    asyncio.run(run(args.only, args.per_city, args.days, args.rotate))

@@ -365,8 +365,10 @@ class _MapScreenState extends State<MapScreen>
 
   // ---------------- BOLGE TARAMA (kuyruk + canli bekleme) ----------------
 
-  /// Istek kuyruklanir, bot isleyene kadar durum izlenir, bitince harita
-  /// kendiliginden yenilenir. auto=true: bos bolgede sistem kendisi tetikledi.
+  /// Istek kuyruklanir; buton en fazla ~15 sn mesgul kalir. Arka planda durum
+  /// izlenir ve harita 12 sn'de bir CANLI yenilenir — bot olaylari tek tek
+  /// yazdigi icin sonuclar tamamlanmayi beklemeden akmaya baslar.
+  /// auto=true: bos bolgede sistem kendisi tetikledi.
   Future<void> _scanVisibleArea({bool auto = false}) async {
     setState(() => _scanning = true);
     final b = _mapController.camera.visibleBounds;
@@ -375,39 +377,55 @@ class _MapScreenState extends State<MapScreen>
       'lat': _mapController.camera.center.latitude,
       'lng': _mapController.camera.center.longitude,
     });
+
+    String id;
     try {
-      final id = await _service.requestScan(
+      id = await _service.requestScan(
         minLat: b.south, minLng: b.west, maxLat: b.north, maxLng: b.east,
       );
-      _toast(auto
-          ? 'Bu bölge ilk kez keşfediliyor 🌍 — haberler aranıyor, harita '
-              'birazdan kendini dolduracak.'
-          : 'Bölge tarama kuyruğuna alındı — bot çalışınca sonuçlar düşecek.');
-
-      // 2 dakika boyunca 4 sn'de bir durum kontrolu (bot lokal/bulutta calisiyorsa).
-      for (var i = 0; i < 30; i++) {
-        await Future.delayed(const Duration(seconds: 4));
-        if (!mounted) return;
-        final status = await _service.scanStatus(id);
-        if (status?['status'] == 'done') {
-          await _reloadData();
-          _toast('Tarama bitti: ${status?['found_count'] ?? 0} olay haritaya eklendi.');
-          break;
-        }
-        if (status?['status'] == 'failed') {
-          _toast('Bu bölge için haber bulunamadı veya tarama başarısız oldu.');
-          break;
-        }
-        if (i == 29) {
-          _toast('İstek kuyrukta — bot en geç 15 dk içinde işleyecek, '
-              'sonuçlar otomatik görünecek.');
-        }
-      }
     } catch (e) {
       _toast('Tarama isteği gönderilemedi — bağlantıyı kontrol et.');
-    } finally {
       if (mounted) setState(() => _scanning = false);
+      return;
     }
+    _toast(auto
+        ? 'Bu bölge ilk kez keşfediliyor 🌍 — sonuçlar geldikçe haritaya düşecek.'
+        : 'Tarama kuyruğa alındı ✅ — sonuçlar geldikçe haritaya düşecek.');
+
+    // Arka plan izleme: 3 sn'de bir durum, ~12 sn'de bir canli harita yenileme.
+    var announcedProcessing = false;
+    var ticks = 0;
+    const maxTicks = 100; // ~5 dk sonra izlemeyi birak (bot saatlik de olabilir)
+    Timer.periodic(const Duration(seconds: 3), (t) async {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      ticks++;
+      // Buton 15 sn sonra serbest: kullanici beklemek zorunda degil.
+      if (ticks == 5 && _scanning) setState(() => _scanning = false);
+      if (ticks % 4 == 0) _reloadData(); // 12 sn'de bir canli akis
+
+      final status = await _service.scanStatus(id);
+      final s = status?['status'];
+      if (s == 'processing' && !announcedProcessing) {
+        announcedProcessing = true;
+        _toast('Bot şu an bu bölgeyi tarıyor 🔍');
+      } else if (s == 'done') {
+        t.cancel();
+        await _reloadData();
+        _toast('Tarama tamamlandı ✅ ${status?['found_count'] ?? 0} olay bulundu.');
+        if (mounted && _scanning) setState(() => _scanning = false);
+      } else if (s == 'failed') {
+        t.cancel();
+        _toast('Bu bölge için haber bulunamadı.');
+        if (mounted && _scanning) setState(() => _scanning = false);
+      } else if (ticks >= maxTicks) {
+        t.cancel();
+        _toast('Tarama kuyrukta bekliyor — bot işleyince sonuçlar '
+            'kendiliğinden görünecek.');
+      }
+    });
   }
 
   void _toast(String msg) {
