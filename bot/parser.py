@@ -72,7 +72,9 @@ def _post_json(url: str, payload: dict, headers: dict) -> dict:
 
 
 def _ask_gemini(system: str, user: str) -> dict:
-    model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+    # Not: bu anahtar turunde calistigi dogrulanan model: gemini-flash-lite-latest
+    # (2.0-flash 429 'kota yok', 2.5-flash 404 verdi — 2026-07 testi)
+    model = os.environ.get("GEMINI_MODEL", "gemini-flash-lite-latest")
     url = ("https://generativelanguage.googleapis.com/v1beta/models/"
            f"{model}:generateContent?key={os.environ['GEMINI_API_KEY']}")
     data = _post_json(url, {

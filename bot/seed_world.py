@@ -101,6 +101,8 @@ async def run(only: str, per_city: int, days: int, rotate: int = 0) -> None:
                 r = process_item(item, city, known, country=country, country_code=cc)
                 stats[r] += 1
                 known.add(item["link"])
+                # Ücretsiz AI katmanlarının dakika limitine takılmamak için tempo.
+                await asyncio.sleep(2)
             except Exception as exc:
                 # Kredi bittiyse boşa dönmeye devam etme: net mesajla DUR.
                 if "credit balance" in str(exc).lower():
